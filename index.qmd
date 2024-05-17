@@ -71,7 +71,7 @@ library(rcartocolor)
 
 r_files <- fs::dir_ls(here::here('R'), glob = "*.R")
 purrr::map(r_files, source)
-deploy_tbl <- read_rds(here::here('data/deploy_tbl.rds'))  |>  
+deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds'))  |>  
   dplyr::mutate(deploy_end_date_time_gmt = lubridate::as_date('2024-12-31'))
 
 ```
