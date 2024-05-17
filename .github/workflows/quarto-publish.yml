@@ -1,5 +1,4 @@
 on:
-  workflow_dispatch:
   push:
     branches: main
   schedule: ## Schedule the job to run every 15 minutes.
