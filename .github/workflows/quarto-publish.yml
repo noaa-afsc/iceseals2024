@@ -1,7 +1,10 @@
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  schedule: ## Schedule the job to run every 15 minutes.
+    - cron: '15 */3 * * *'
+
 
 name: Render and Publish
 

@@ -1996,8 +1996,8 @@
       "RemoteHost": "api.github.com",
       "RemoteRepo": "wcUtils",
       "RemoteUsername": "noaa-afsc",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "150d1047e569a8ef4c367bd374b47e6bc16312b0",
+      "RemoteRef": "dev",
+      "RemoteSha": "750bca0daad0304adbe6330729e37f55ea4881c9",
       "Requirements": [
         "R",
         "XML",
@@ -2016,7 +2016,7 @@
         "tidyr",
         "xml2"
       ],
-      "Hash": "537aaedf8060becc4648c9830a01571f"
+      "Hash": "6a4a9d490747a87210f57b406963e274"
     },
     "withr": {
       "Package": "withr",
