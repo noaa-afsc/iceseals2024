@@ -1,0 +1,504 @@
+---
+title: "Movement Ecology and Behavior of Ribbon and Spotted Seals in the Bering Sea, 2024 "
+execute:
+  echo: false
+  warning: false
+  message: false
+format: 
+  html:
+    fig-width: 8
+    fig-height: 6
+search: false
+
+author:
+  - id: jml
+    name:
+      literal: Josh M. London
+    email: josh.london@noaa.gov
+    orcid: 0000-0002-3647-5046
+    attributes:
+      corresponding: true
+    affiliations: 
+      - ref: mml
+  - id: hlz
+    name:
+      literal: Heather L. Zeil
+    email: heather.zeil@noaa.gov
+    affiliations: 
+      - ref: mml
+  - id: skh
+    name:
+      literal: Stacie M. Koslovsky
+    email: stacie.koslovsky@noaa.gov
+    affiliations: 
+      - ref: mml
+  - id: mfc
+    name:
+      literal: Michael F. Cameron
+    email: michael.cameron@noaa.gov
+    affiliations: 
+      - ref: mml
+affiliations:
+  - id: mml
+    name: AFSC Marine Mammal Laboratory, NOAA Fisheries
+    address: 7600 Sand Point Way NE
+    city: Seattle
+    region: Washington
+    country: United States
+    postal-code: 98115
+    url: https://www.fisheries.noaa.gov/about/marine-mammal-laboratory
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(purrr)
+library(fs)
+library(tidyr)
+library(lubridate)
+library(stringr)
+library(ggplot2)
+library(janitor)
+library(readr)
+library(googlesheets4)
+library(wcUtils)
+library(scam)
+library(sf)
+library(googlesheets4)
+library(rdeck)
+library(aniMotum)
+library(rcartocolor)
+
+r_files <- fs::dir_ls(here::here('R'), glob = "*.R")
+purrr::map(r_files, source)
+deploy_tbl <- read_rds(here::here('data/deploy_tbl.rds'))  |>  
+  dplyr::mutate(deploy_end_date_time_gmt = lubridate::as_date('2024-12-31'))
+
+```
+
+```{r}
+#| include: false
+data_list <- get_wc_data(deploy_tbl$deployid)
+```
+
+:::{.callout-warning}
+The information on this page is automatically updated every hour and without
+any significant quality checks. Errors may be present and are likely. We are
+providing access to the information in a public forum in the spirit of open
+science and to provide easy access to updated information for the authors and
+interested researchers. 
+
+**The information provided here should not be cited or
+referenced in any form**
+:::
+
+::: {.column-margin}
+Disclaimer
+
+The scientific results and conclusions, as well as any views or opinions
+expressed herein, are those of the author(s) and do not necessarily reflect the
+views of NMFS, NOAA, or the Department of Commerce. 
+:::
+
+## Predicted Movements
+
+Each seal is released with a bio-logger that provides regular updates on 
+movement and behavior. For each seal, the observed locations are used to fit
+a predicted path. Both the predicted track (line) and the observed bio-logger
+locations (points) are shown on the map. Because some of the tracks span the
+180 anti-meridian, you may need to re-center and zoom the map to the Bering Sea
+region
+
+```{r}
+#| include: false
+map_proj <- "+proj=laea +lat_0=90 +lon_0=180 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+
+locs <- sf::st_as_sf(data_list$locs,
+                     coords = c("longitude","latitude"),
+                     crs = 4326) %>% 
+  left_join(deploy_tbl) %>% 
+  dplyr::filter(between(date_time,
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt)) %>% 
+  dplyr::rename(datetime=date_time)
+
+locs <- locs %>%
+  group_by(speno) %>%
+  arrange(datetime, error_radius) %>%
+    mutate(
+      rank = 1L,
+      rank = case_when(duplicated(datetime, fromLast = FALSE) ~
+                         lag(rank) + 1L, TRUE ~ rank)) %>%
+    dplyr::filter(rank == 1) %>% 
+  arrange(speno,datetime) %>% 
+  ungroup() 
+
+locs <- locs |> 
+  dplyr::mutate(
+    quality = case_when(
+      type == 'FastGPS' ~ 'G',
+      type == 'User' ~ 'G',
+      .default = quality
+    )
+  ) |> 
+  dplyr::filter(!quality %in% c('Z')) |> 
+  sf::st_transform(map_proj)
+
+locs_fit <- fit_ssm(
+  x = locs,
+  vmax = 8,
+  model = "crw",
+  time.step = 0.25,
+  id = "speno",
+  date = "datetime",
+  lc = "quality",
+  epar = c(
+    "error_semi_major_axis",
+    "error_semi_minor_axis",
+    "error_ellipse_orientation"
+  ),
+  tz = "UTC"
+)
+
+predict_pts_sf <-
+  grab(locs_fit,
+       what = "predicted",
+       as_sf = TRUE,
+       group = TRUE) |> 
+  rename(speno = id,
+         datetime = date) |> 
+  left_join(deploy_tbl)
+
+predict_lines_sf <- predict_pts_sf %>% 
+  group_by(speno) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING") %>%
+  left_join(deploy_tbl)
+
+map_lines <- predict_lines_sf |> 
+st_transform(4326)
+
+bbox_center <- st_bbox(predict_lines_sf) %>% 
+  st_as_sfc() |> 
+st_transform(4326) |> 
+st_break_antimeridian(lon_0=180)
+
+map_last_loc <- predict_pts_sf %>% 
+  sf::st_transform(4326) %>% 
+  group_by(speno) %>% 
+  arrange(speno,datetime) %>% 
+  group_map(~ tail(.x, 1L), .keep=TRUE) %>% 
+  bind_rows()
+
+map_locs <- locs %>% 
+  sf::st_transform(4326) %>% 
+  group_by(speno) 
+
+mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+                initial_bounds = bbox_center[1],
+                controller = TRUE) %>%
+  add_path_layer(data = map_lines,
+                    name = "Ice Seals 2024",
+                    opacity = 0.8,
+                    get_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel")
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_path = geometry) %>%
+    add_scatterplot_layer(data = map_locs,
+                    name = "obaerved locations",
+                    opacity = 0.35,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 2,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime)) %>% 
+  add_scatterplot_layer(data = map_last_loc,
+                    name = "latest location",
+                    opacity = 1,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 4,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime))
+```
+
+::: {.column-page}
+
+```{r}
+mapbox_map
+```
+
+:::
+
+## Haul-out Behavior
+
+Each of the bio-loggers are programmed to report the percentage of time the
+device was dry for each hour. For example, a seal that was hauled out for an
+entire hour would report as 100% dry. The hours are shown as UTC hours. To
+adjust for apparent solar noon, subtract approximately 12 hours.
+
+```{r}
+#| fig-asp: 1
+ho_data <- data_list$haul_out |> 
+  left_join(deploy_tbl) |> 
+  dplyr::filter(between(timeline_start_dt + lubridate::hours(6),
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt))  |>  
+  dplyr::rename(haulout_dt=timeline_start_dt) |> 
+  dplyr::select(speno, haulout_dt, percent_dry)  |> 
+  dplyr::mutate(percent_dry = mean(percent_dry,na.rm=TRUE), 
+                                  .by = c(speno, haulout_dt)) |> 
+  arrange(speno,haulout_dt) |>  
+  mutate(year = lubridate::year(haulout_dt),
+         month = lubridate::month(haulout_dt,label=TRUE),
+         day = lubridate::day(haulout_dt),
+         hour = lubridate::hour(haulout_dt))
+
+p <- ggplot(ho_data,aes(day,hour,fill=percent_dry))+
+  geom_tile(linewidth = 0.1, color = "grey75") + 
+  scico::scale_fill_scico(palette = "nuuk", direction = 1,
+  labels = scales::percent_format(scale=1),
+                       aesthetics = "fill",
+    guide = guide_colorbar(title.position = "top", barwidth = 15,
+                           barheight = 0.5, title.hjust = 0)
+    ) +
+  coord_cartesian(clip = "off")
+
+p <- p + facet_grid(speno~month)
+p <- p + scale_x_continuous(breaks = c(5,15,25), expand = c(0,0)) +
+  scale_y_continuous(breaks = c(4,12,20), labels = c("04:00","12:00","20:00"))
+
+p <- p + theme(legend.position = "top", legend.justification = "left") +
+  theme(strip.background = element_rect(colour="white")) +
+  theme(axis.ticks=element_blank()) +
+  xlab("day of month") + ylab("hour (UTC)")
+p
+```
+
+
+## Dive Behavior
+
+The bio-loggers that are attached to the hair of the nape or head of seals
+are capable of determining depth through a pressure transducer. This allows for
+a variety of data products that describe the dive behavior of seals.
+
+### Time At Depth from Cumulative Distribution
+
+Here, dive behavior is described as proportion of time at given depths. This
+relatively new data product transmits a cumulative distribution of time at
+depth for each 2 hour summary period. The distribution adjusts to accomodate
+different maximum depths and darker red areas indicate depths where the seal is
+choosing to spend more time. The grey blocks above indicate proportion of time
+dry within the summary period.
+
+```{r}
+
+ecd_data <- data_list$ecdf %>% 
+  dplyr::rename(deployid = deploy_id) %>% 
+  dplyr::arrange(deployid, start) %>% 
+  rowwise() %>% 
+  dplyr::mutate(spline_interp = list(spline_ecdf(full_ecdf, bin.width=5)),
+                depth50pct = x_pct_depth(full_ecdf,pct_tad = 0.5),
+                n_dives = if_else(all(is.na(n_dives_shallow),is.na(n_dives_deep)),
+                                  NA, mean(c(n_dives_shallow,n_dives_deep), na.rm=TRUE))
+  ) %>% 
+  dplyr::select(c(deployid,start:percent_dry,shallow_ecdf, 
+                  deep_ecdf,full_ecdf,spline_interp,depth50pct, n_dives)) %>% 
+  unnest(spline_interp, keep_empty = TRUE) %>% 
+  group_by(deployid, start, end, kind, percent_dry) %>% 
+  dplyr::arrange(deployid, start, depth_break) %>% 
+  dplyr::mutate(propTAD = c(0,diff(ecd_prop)),
+                minTAD = 120*(1-0.01*percent_dry) * propTAD) %>% 
+  # determine the next depth value
+  dplyr::mutate(next_depth = dplyr::lead(depth_break)) %>%
+  # determine previous depth for plotting
+  dplyr::mutate(prev_depth = dplyr::lag(depth_break)) %>%
+  dplyr::select(-next_depth) %>%
+  # transform depths to negative values
+  dplyr::mutate(depth_break = depth_break * -1,
+                prev_depth = prev_depth * -1)
+
+ecd_data <- ecd_data %>% 
+  group_by(deployid) %>% 
+  arrange(start)
+```
+
+```{r}
+
+ecd_data %>% 
+  left_join(deploy_tbl) %>% 
+  dplyr::filter(between(end,deploy_date_time_gmt,deploy_end_date_time_gmt)) %>%
+ggplot() +
+  geom_rect(aes(xmin = start, xmax = end,
+                ymin = 0, ymax = percent_dry/10),
+            fill = "seashell3") +
+  geom_rect(aes(xmin = start, xmax = end,
+                ymin = depth_break, ymax = prev_depth,
+                fill = propTAD),
+            color = NA) +
+  scale_fill_distiller(palette = "Reds",
+                   direction = 1, trans = "log10",
+                       guide = guide_colorbar(
+                         title = 'proportion of time submerged',
+                         title.position = 'bottom',
+                         title.hjust = 0.5,
+                         barwidth = unit(75, units = "mm"),
+                         barheight = unit(2, units = "mm"))) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  labs(title = "Ribbon (HF) and Spotted Seals (PL), 2024",
+       subtitle = "each bar represents 2 hour binned at 5m depth increments",
+       caption = stringr::str_wrap("data derived from the Emperical Cumulative 
+                                   Distribution (ECD) of time at depth 
+                                   transmitted via the Argos satellite network")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Time At Depth from Histogram Bins
+
+One bio-logger deployed on a sub-adult spotted seal (SPENO = PL2024_1003) was
+programmed with time at depth information based on pre-defined histogram bins.
+The depth range encompassed by each bin is courser than with the above
+cumulative distribution data.
+
+```{r}
+
+data_list$tad %>% 
+  left_join(deploy_tbl) %>% 
+  dplyr::rename(start = tad_start_dt,
+                depth_break = bin_upper_limit) |> 
+  dplyr::arrange(deployid, start) |> 
+  dplyr::mutate(end = start + lubridate::hours(2)) |>
+  dplyr::filter(between(end,deploy_date_time_gmt,deploy_end_date_time_gmt)) %>%
+  dplyr::filter(bin != 'bin14') |> 
+  dplyr::mutate(depth_break = as.numeric(depth_break),
+                pct_tad = pct_tad*0.01) |> 
+  group_by(deployid, start, end) |> 
+  # determine the next depth value
+  dplyr::mutate(next_depth = dplyr::lead(depth_break)) %>%
+  # determine previous depth for plotting
+  dplyr::mutate(prev_depth = dplyr::lag(depth_break)) %>%
+  dplyr::select(-next_depth) %>%
+  dplyr::mutate(prev_depth = ifelse(is.na(prev_depth),0,prev_depth)) |>
+  # transform depths to negative values
+  dplyr::mutate(depth_break = depth_break * -1,
+                prev_depth = prev_depth * -1) |> 
+  dplyr::filter(!is.na(pct_tad) & pct_tad > 0) |> 
+                
+ggplot() +
+  geom_rect(aes(xmin = start, xmax = end,
+                ymin = depth_break, ymax = prev_depth,
+                fill = pct_tad),
+            color = NA) +
+  scale_fill_distiller(palette = "Reds",
+                   direction = 1, trans = "log10",
+                       guide = guide_colorbar(
+                         title = 'proportion of time submerged',
+                         title.position = 'bottom',
+                         title.hjust = 0.5,
+                         barwidth = unit(75, units = "mm"),
+                         barheight = unit(2, units = "mm"))) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  labs(title = "Ribbon (HF) and Spotted Seals (PL), 2024",
+       subtitle = "each bar represents 2 hours binned at set depth increments",
+       caption = stringr::str_wrap("histograms of time at depth 
+                                   transmitted via the Argos satellite network")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Dive Behavior Records
+
+The sub-adult spotted seal (SPENO = PL2024_1003) was also programmed to provide
+more detailed information regarding individual dives. For each dive, the start
+time, end time, and maximum depth are recorded. The subsequent post-dive interval
+at the surface is also recorded. This is bundled into 5 consecutive dive + 
+post-dive intervals.
+
+```{r}
+data_list$behav |> 
+  left_join(deploy_tbl) |> 
+ggplot() + 
+  geom_rect(aes(xmin=start,
+                xmax=end,
+                ymin=0,
+                ymax=-1*depth_min),
+                linetype=0,
+                fill = rcartocolor::carto_pal(3,"Bold")[1]) +
+  theme(axis.title = element_text()) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  theme_minimal()
+```
+
+
+## Oceanographic Temperature Profiles
+
+Approximately two times per day, the bio-loggers will record a temperature
+profile upcast from the deepest dive during a two hour summary period. This
+provides unique insight into the oceanography and structure of the water
+these seals are foraging in.
+
+```{r}
+pdt_data <- data_list$pdt %>% 
+  group_by(deploy_id,date) %>% 
+  mutate(data_hr = lubridate::round_date(date,unit="hour"),
+         x1 = data_hr - hours(2),
+         x2 = data_hr + hours(2)) %>% 
+  dplyr::mutate(next_depth = dplyr::lead(depth)) %>%
+  # determine previous depth for plotting
+  dplyr::mutate(prev_depth = dplyr::lag(depth)) %>%
+  dplyr::select(-next_depth) %>%
+  # transform depths to negative values
+  dplyr::mutate(depth = depth * -1,
+                prev_depth = prev_depth * -1) %>% 
+  ungroup() %>% 
+  left_join(deploy_tbl, by=c("deploy_id" = "deployid")) %>% 
+  dplyr::filter(between(data_hr,deploy_date_time_gmt,deploy_end_date_time_gmt))
+```
+
+
+```{r}
+pdt_data %>% 
+  filter(depth<0) %>% 
+ggplot() +
+  geom_rect(aes(xmin = x1, xmax = x2,
+                ymin = prev_depth, ymax=depth,
+                fill=max_te), colour=NA) +
+  scale_fill_distiller(palette = "Spectral",
+                   direction = -1,
+                       guide = guide_colorbar(
+                         title = 'temperature (C)',
+                         title.position = 'bottom',
+                         title.hjust = 0.5,
+                         barwidth = unit(75, units = "mm"),
+                         barheight = unit(2, units = "mm"))) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  labs(title = "Temperature at Depth (transmitted)",
+       subtitle = "each bar depicts data from a single upcast as an 4-hour window") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
