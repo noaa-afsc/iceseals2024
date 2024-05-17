@@ -9,7 +9,7 @@ get_wc_data <- function(deployids) {
   
   all_locs_tbl <- purrr::map(res,"all_locations") %>% 
     dplyr::bind_rows() %>% 
-    dplyr::drop_na(any_of(c("latitude", "longitude")))
+    tidyr::drop_na(any_of(c("latitude", "longitude")))
   
   locs_tbl <- purrr::map(res,"locations") %>% 
     dplyr::bind_rows() %>% 
