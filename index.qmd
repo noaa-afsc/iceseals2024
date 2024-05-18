@@ -496,8 +496,8 @@ seals are foraging in.
 pdt_data <- data_list$pdt %>% 
   group_by(deploy_id,date) %>% 
   mutate(data_hr = lubridate::round_date(date,unit="hour"),
-         x1 = data_hr - hours(1.5),
-         x2 = data_hr + hours(1.5)) %>% 
+         x1 = data_hr - minutes(90),
+         x2 = data_hr + minutes(90)) %>% 
   dplyr::mutate(next_depth = dplyr::lead(depth)) %>%
   # determine previous depth for plotting
   dplyr::mutate(prev_depth = dplyr::lag(depth)) %>%
