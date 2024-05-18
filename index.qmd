@@ -139,7 +139,10 @@ movement and behavior. For each seal, the observed locations are used to fit a
 predicted path. Both the predicted track (line) and the observed bio-logger
 locations (points) are shown on the map. Because some of the tracks span the 180
 anti-meridian, you may need to re-center and zoom the map to the Bering Sea
-region
+region.
+
+The ship track of the R/V Norseman II is shown in black and can be toggled
+on/off using the layer selector in the upper left corner.
 
 ```{r}
 #| include: false
@@ -226,11 +229,21 @@ map_locs <- locs %>%
   sf::st_transform(4326) %>% 
   group_by(speno) 
 
+ship_track <- readr::read_rds(here::here('data/ship_track.rds'))
+
 mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
                 initial_bounds = bbox_center[1],
                 controller = TRUE) %>%
+  add_path_layer(data = ship_track,
+                    name = "Ship Track",
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_color = "#000000",
+                    opacity = 0.25,
+                    get_path = geometry) |> 
   add_path_layer(data = map_lines,
-                    name = "Ice Seals 2024",
+                    name = "Predicted Movements",
                     opacity = 0.8,
                     get_color = scale_color_category(
                       col = speno,
@@ -241,7 +254,7 @@ mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p
                     width_min_pixels = 1.5,
                     get_path = geometry) %>%
     add_scatterplot_layer(data = map_locs,
-                    name = "obaerved locations",
+                    name = "Observed Locations",
                     opacity = 0.35,
                     get_fill_color = scale_color_category(
                       col = speno,
@@ -255,7 +268,7 @@ mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p
                     pickable = TRUE,
                     tooltip = c(speno,datetime)) %>% 
   add_scatterplot_layer(data = map_last_loc,
-                    name = "latest location",
+                    name = "Latest Location",
                     opacity = 1,
                     get_fill_color = scale_color_category(
                       col = speno,
