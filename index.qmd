@@ -22,8 +22,8 @@ author:
       - ref: mml
   - id: hlz
     name:
-      literal: Heather L. Zeil
-    email: heather.zeil@noaa.gov
+      literal: Heather L. Ziel
+    email: heather.ziel@noaa.gov
     affiliations: 
       - ref: mml
   - id: skh
@@ -287,7 +287,7 @@ adjust for apparent solar noon, subtract approximately 12 hours.
 #| fig-asp: 1
 ho_data <- data_list$haul_out |> 
   left_join(deploy_tbl) |> 
-  dplyr::filter(between(timeline_start_dt + lubridate::hours(6),
+  dplyr::filter(between(timeline_start_dt,
                         deploy_date_time_gmt,
                         deploy_end_date_time_gmt))  |>  
   dplyr::rename(haulout_dt=timeline_start_dt) |> 
