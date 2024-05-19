@@ -233,6 +233,7 @@ ship_track <- readr::read_rds(here::here('data/ship_track.rds'))
 
 mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
                 initial_bounds = bbox_center[1],
+                theme = "light",
                 controller = TRUE) %>%
   add_path_layer(data = ship_track,
                     name = "Ship Track",
