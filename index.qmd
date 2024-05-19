@@ -297,7 +297,7 @@ entire hour would report as 100% dry. The hours are shown as UTC hours. To
 adjust for apparent solar noon, subtract approximately 12 hours.
 
 ```{r}
-#| fig-asp: 1
+#| fig-asp: 1.2
 ho_data <- data_list$haul_out |> 
   left_join(deploy_tbl) |> 
   dplyr::filter(between(timeline_start_dt,
@@ -381,7 +381,7 @@ ecd_data <- ecd_data %>%
 ```
 
 ```{r}
-#| fig-asp: 1
+#| fig-asp: 1.2
 ecd_data %>% 
   left_join(deploy_tbl) %>% 
   dplyr::filter(between(end,deploy_date_time_gmt,deploy_end_date_time_gmt)) %>%
@@ -524,7 +524,7 @@ pdt_data <- data_list$pdt %>%
 ```
 
 ```{r}
-#| fig-asp: 1
+#| fig-asp: 1.2
 pdt_data %>% 
   filter(depth<0) %>% 
 ggplot() +

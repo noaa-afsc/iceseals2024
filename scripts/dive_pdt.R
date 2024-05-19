@@ -23,6 +23,6 @@ ggplot(data = dive_pdt, aes(x = Date, y = Depth * -1, color = Temperature )) +
   labs(y = "Depth (meters)",
        x = "",
        title = stringr::str_wrap("Measurements of temperature at depth from a bio-logger deployed on a spotted seal in the western Bering Sea",60),
-       subtitle = "approximate location: 60.946, -177.332") +
+       subtitle = "seal has moved from east to west along shelf break to Russian coast") +
   theme_minimal() +
   theme(legend.position = "bottom")
