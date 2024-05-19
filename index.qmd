@@ -69,6 +69,7 @@ library(rdeck)
 library(aniMotum)
 library(rcartocolor)
 library(gt)
+library(ggdist)
 
 r_files <- fs::dir_ls(here::here('R'), glob = "*.R")
 purrr::map(r_files, source)
@@ -328,7 +329,8 @@ p <- p + facet_grid(speno~month)
 p <- p + scale_x_continuous(breaks = c(5,15,25), expand = c(0,0)) +
   scale_y_continuous(breaks = c(4,12,20), labels = c("04:00","12:00","20:00"))
 
-p <- p + theme(legend.position = "top", legend.justification = "left") +
+p <- p + theme_minimal() +
+  theme(legend.position = "top", legend.justification = "left") +
   theme(strip.background = element_rect(colour="white")) +
   theme(axis.ticks=element_blank()) +
   xlab("day of month") + ylab("hour (UTC)")
@@ -498,6 +500,39 @@ ggplot() +
   theme_minimal() +
   theme(axis.title = element_text())
 ```
+
+```{r}
+#| fig-asp: 0.618
+data_list$behav |> 
+  left_join(deploy_tbl) |> 
+  dplyr::filter(what == "Dive") |> 
+  dplyr::select(deployid,what,depth_max,duration_max) |> 
+  ggplot(aes(x = duration_max, y = what)) +
+  geom_boxplot(width = 0.05,
+              color = rcartocolor::carto_pal(3,"Bold")[1]) +
+  geom_point(shape = "|",
+             size = 8,
+             alpha = 0.15,
+             position = position_nudge(y = -0.15),
+             color = rcartocolor::carto_pal(3,"Bold")[1]
+  ) +
+  stat_slab(height = 0.75,
+            position = position_nudge(y = 0.1),
+            fill = rcartocolor::carto_pal(3,"Bold")[1]
+  ) +
+  xlab("dive duration (seconds)") +
+  labs(title = "Spotted Seal (PL2024_1003) Dive Duration",
+       subtitle = "rain cloud plot showing distribution of dive durations") +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  theme(axis.title = element_text())
+  
+```
+
 
 ## Oceanographic Temperature Profiles
 
