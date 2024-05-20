@@ -418,10 +418,10 @@ ggplot() +
 
 ### Time At Depth from Histogram Bins
 
-One bio-logger deployed on a sub-adult spotted seal (SPENO = PL2024_1003) was
-programmed with time at depth information based on pre-defined histogram bins.
-The depth range encompassed by each bin is courser than with the above
-cumulative distribution data.
+Two bio-loggers deployed on sub-adult spotted seals (SPENO: PL2024_1003,
+PL2024_1017) were programmed to collect time at depth information based on
+pre-defined histogram bins. The depth range encompassed by each bin is courser
+than with the above cumulative distribution data.
 
 ```{r}
 #| fig-asp: 0.618
@@ -473,11 +473,13 @@ ggplot() +
 
 ### Dive Behavior Records
 
-The sub-adult spotted seal (SPENO = PL2024_1003) was also programmed to provide
-more detailed information regarding individual dives. For each dive, the start
-time, end time, and maximum depth are recorded. The subsequent post-dive
-interval at the surface is also recorded. This is bundled into 5 consecutive
-dive + post-dive intervals.
+The two sub-adult spotted seals (SPENO: PL2024_1003, PL2024_1017) were also
+programmed to provide more detailed information regarding individual dives. For
+each dive, the start time, end time, and maximum depth are recorded. The
+subsequent post-dive interval at the surface is also recorded. This is bundled
+into 5 consecutive dive + post-dive intervals. In addition to providing 
+information on dive depths and dive frequency we can also explore the overall
+distribution of dive duration.
 
 ```{r}
 #| fig-asp: 0.618
@@ -493,7 +495,7 @@ ggplot() +
   scale_x_datetime() +
   facet_grid(speno ~ .) +
   ylab("depth (meters)") +
-  labs(title = "Spotted Seal (PL2024_1003) Dive Behavior",
+  labs(title = "Spotted Seal Dive Behavior",
        subtitle = "each bar represents a single dive",
   caption = stringr::str_wrap("dive behavior details 
                                    transmitted via the Argos satellite network")) +
@@ -506,7 +508,7 @@ ggplot() +
 data_list$behav |> 
   left_join(deploy_tbl) |> 
   dplyr::filter(what == "Dive") |> 
-  dplyr::select(deployid,what,depth_max,duration_max) |> 
+  dplyr::select(speno,what,depth_max,duration_max) |> 
   ggplot(aes(x = duration_max, y = what)) +
   geom_boxplot(width = 0.05,
               color = rcartocolor::carto_pal(3,"Bold")[1]) +
@@ -520,8 +522,9 @@ data_list$behav |>
             position = position_nudge(y = 0.1),
             fill = rcartocolor::carto_pal(3,"Bold")[1]
   ) +
+  facet_grid(speno ~ .) +
   xlab("dive duration (seconds)") +
-  labs(title = "Spotted Seal (PL2024_1003) Dive Duration",
+  labs(title = "Spotted Seal Dive Duration",
        subtitle = "rain cloud plot showing distribution of dive durations") +
   theme_minimal() +
   theme(
