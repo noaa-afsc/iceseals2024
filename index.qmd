@@ -594,7 +594,7 @@ This figure provides some diagnostic and performance insights to tag deployments
 and attachment locations.
 
 ```{r}
-#| fig.asp: 1.6
+#| fig.asp: 1.7
 
 msg_data <- data_list$messages |> 
   left_join(deploy_tbl) |> 
