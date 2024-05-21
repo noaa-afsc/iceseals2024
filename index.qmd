@@ -565,11 +565,11 @@ pdt_data <- data_list$pdt %>%
 ```{r}
 #| fig-asp: 1.3
 pdt_data %>% 
-  filter(depth<0) %>% 
+  filter(depth<0,speno != 'PL2024_1017') %>% 
 ggplot() +
   geom_rect(aes(xmin = x1, xmax = x2,
                 ymin = prev_depth, ymax=depth,
-                fill=max_te), colour=NA) +
+                fill=min_te), colour=NA) +
   scale_fill_distiller(palette = "Spectral",
                    direction = -1,
                        guide = guide_colorbar(
