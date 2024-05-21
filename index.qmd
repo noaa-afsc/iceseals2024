@@ -291,6 +291,7 @@ mapbox_map
 ```
 :::
 
+
 ## Haul-out Behavior
 
 Each of the bio-loggers are programmed to report the percentage of time the
@@ -585,4 +586,34 @@ ggplot() +
        subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
   theme_minimal() +
   theme(legend.position = "bottom")
+```
+
+## Satellite Transmissions
+
+This figure provides some diagnostic and performance insights to tag deployments
+and attachment locations.
+
+```{r}
+#| fig.asp: 1.6
+
+msg_data <- data_list$messages |> 
+  left_join(deploy_tbl) |> 
+  dplyr::filter(between(msg_date,
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt)) |> 
+  dplyr::select(speno,attachment,msg_date,msg_count=msg) |> 
+  dplyr::mutate(msg_day = lubridate::date(msg_date)) |> 
+  dplyr::group_by(speno,attachment,msg_day) |> 
+  dplyr::summarise(total_count = sum(msg_count))
+
+ggplot(data = msg_data) + 
+  geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
+  scale_fill_carto_d(palette = "Vivid") +
+  facet_grid(speno ~ .) +
+  ylab("date") +
+  labs(title = "Satellite Messages Recieved by Attachment Type",
+       subtitle = "each bar the total number of messages recieved each day",) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title=element_blank())
 ```

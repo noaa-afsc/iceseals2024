@@ -6,7 +6,7 @@ library(readr)
 read_sheet(
   "1qdItHYew9a-6xkUpIjnmauv-rP09FPg3rIzdjalX8xU"
 ) %>% 
-  select(1,2,5,10) %>% 
+  select(1,2,5,10,15) %>% 
   janitor::clean_names() %>% 
   rename(deployid = deploy_id,
          speno = animal_tag_id) %>% 

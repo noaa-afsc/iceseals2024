@@ -38,6 +38,9 @@ get_wc_data <- function(deployids) {
   haul_out <- purrr::map(histos,tidyTimelines) |> 
     dplyr::bind_rows()
   
+  msgs_tbl <- purrr::map(res,"messages") |> 
+    dplyr::bind_rows()
+  
   return(list(locs=locs_tbl,ecdf=ecdf_tbl,pdt=pdt_tbl,behav=behav_tbl,
-              tad=tad_tbl,haul_out=haul_out))
+              tad=tad_tbl,haul_out=haul_out, messages=msgs_tbl))
 }
