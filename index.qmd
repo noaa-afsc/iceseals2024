@@ -80,7 +80,9 @@ deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds'))  |>
 
 ```{r}
 #| include: false
-data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('PL2024_1023_18U1318','HF2024_1021_19U2627','HF2024_1019_19U2623')])
+#data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('PL2024_1023_18U1318','HF2024_1021_19U2627','HF2024_1019_19U2623')])
+
+data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('HF2024_1019_19U2623')]) 
 ```
 
 ::: callout-warning
@@ -299,15 +301,16 @@ device was dry for each hour. For example, a seal that was hauled out for an
 entire hour would report as 100% dry. The hours are shown as UTC hours. To
 adjust for apparent solar noon, subtract approximately 12 hours.
 
+::: {.panel-tabset}
+
 ```{r}
-#| fig-asp: 1.4
 ho_data <- data_list$haul_out |> 
   left_join(deploy_tbl) |> 
   dplyr::filter(between(timeline_start_dt,
                         deploy_date_time_gmt,
                         deploy_end_date_time_gmt))  |>  
   dplyr::rename(haulout_dt=timeline_start_dt) |> 
-  dplyr::select(speno, haulout_dt, percent_dry)  |> 
+  dplyr::select(species = common_name, speno, haulout_dt, percent_dry)  |> 
   dplyr::mutate(percent_dry = mean(percent_dry,na.rm=TRUE), 
                                   .by = c(speno, haulout_dt)) |> 
   arrange(speno,haulout_dt) |>  
@@ -315,8 +318,14 @@ ho_data <- data_list$haul_out |>
          month = lubridate::month(haulout_dt,label=TRUE),
          day = lubridate::day(haulout_dt),
          hour = lubridate::hour(haulout_dt))
+```
 
-p <- ggplot(ho_data,aes(day,hour,fill=percent_dry))+
+### Ribbon seals
+
+```{r}
+#| fig-asp: 1.3
+
+p <- ggplot(ho_data |> dplyr::filter(species == 'ribbon seal'),aes(day,hour,fill=percent_dry))+
   geom_tile(linewidth = 0.1, color = "grey75") + 
   scico::scale_fill_scico(palette = "nuuk", direction = 1,
   labels = scales::percent_format(scale=1),
@@ -338,6 +347,36 @@ p <- p + theme_minimal() +
 p
 ```
 
+### Spotted seals
+
+```{r}
+#| fig-asp: 1.3
+
+p <- ggplot(ho_data |> dplyr::filter(species == 'spotted seal'),
+              aes(day,hour,fill=percent_dry))+
+  geom_tile(linewidth = 0.1, color = "grey75") + 
+  scico::scale_fill_scico(palette = "nuuk", direction = 1,
+  labels = scales::percent_format(scale=1),
+                       aesthetics = "fill",
+    guide = guide_colorbar(title.position = "top", barwidth = 15,
+                           barheight = 0.5, title.hjust = 0)
+    ) +
+  coord_cartesian(clip = "off")
+
+p <- p + facet_grid(speno~month)
+p <- p + scale_x_continuous(breaks = c(5,15,25), expand = c(0,0)) +
+  scale_y_continuous(breaks = c(4,12,20), labels = c("04:00","12:00","20:00"))
+
+p <- p + theme_minimal() +
+  theme(legend.position = "top", legend.justification = "left") +
+  theme(strip.background = element_rect(colour="white")) +
+  theme(axis.ticks=element_blank()) +
+  xlab("day of month") + ylab("hour (UTC)")
+p
+```
+
+:::
+
 ## Dive Behavior
 
 The bio-loggers that are attached to the hair of the nape or head of seals are
@@ -353,17 +392,20 @@ maximum depths and darker red areas indicate depths where the seal is choosing
 to spend more time. The grey blocks above indicate proportion of time dry within
 the summary period.
 
+::: {.panel-tabset}
+
 ```{r}
 ecd_data <- data_list$ecdf %>% 
   dplyr::rename(deployid = deploy_id) %>% 
   dplyr::arrange(deployid, start) %>% 
+  left_join(deploy_tbl) %>% 
   rowwise() %>% 
   dplyr::mutate(spline_interp = list(spline_ecdf(full_ecdf, bin.width=5)),
                 depth50pct = x_pct_depth(full_ecdf,pct_tad = 0.5),
                 n_dives = if_else(all(is.na(n_dives_shallow),is.na(n_dives_deep)),
                                   NA, mean(c(n_dives_shallow,n_dives_deep), na.rm=TRUE))
   ) %>% 
-  dplyr::select(c(deployid,start:percent_dry,shallow_ecdf, 
+  dplyr::select(c(species = common_name,speno,deployid,deploy_date_time_gmt,deploy_end_date_time_gmt,start:percent_dry,shallow_ecdf, 
                   deep_ecdf,full_ecdf,spline_interp,depth50pct, n_dives)) %>% 
   unnest(spline_interp, keep_empty = TRUE) %>% 
   group_by(deployid, start, end, kind, percent_dry) %>% 
@@ -384,11 +426,15 @@ ecd_data <- ecd_data %>%
   arrange(start)
 ```
 
+#### Ribbon seals
+
 ```{r}
-#| fig-asp: 1.4
+#| fig-asp: 1.2
 ecd_data %>% 
-  left_join(deploy_tbl) %>% 
-  dplyr::filter(between(end,deploy_date_time_gmt,deploy_end_date_time_gmt)) %>%
+  dplyr::filter(species == 'ribbon seal',
+                between(end,
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt)) %>%
 ggplot() +
   geom_rect(aes(xmin = start, xmax = end,
                 ymin = 0, ymax = percent_dry/10),
@@ -408,7 +454,7 @@ ggplot() +
   scale_x_datetime() +
   facet_grid(speno ~ .) +
   ylab("depth (meters)") +
-  labs(title = "Ribbon (HF) and Spotted Seals (PL), 2024",
+  labs(title = "Ribbon Seals (HF), 2024",
        subtitle = "each bar represents 2 hours binned at 5m depth increments",
        caption = stringr::str_wrap("data derived from the Emperical Cumulative 
                                    Distribution (ECD) of time at depth 
@@ -416,6 +462,46 @@ ggplot() +
   theme_minimal() +
   theme(legend.position = "bottom")
 ```
+
+#### Spotted seals
+
+```{r}
+#| fig-asp: 1.2
+ecd_data %>% 
+  left_join(deploy_tbl) %>% 
+  dplyr::filter(species == 'spotted seal',
+                between(end,
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt)) %>%
+ggplot() +
+  geom_rect(aes(xmin = start, xmax = end,
+                ymin = 0, ymax = percent_dry/10),
+            fill = "seashell3") +
+  geom_rect(aes(xmin = start, xmax = end,
+                ymin = depth_break, ymax = prev_depth,
+                fill = propTAD),
+            color = NA) +
+  scale_fill_distiller(palette = "Reds",
+                   direction = 1, trans = "log10",
+                       guide = guide_colorbar(
+                         title = 'proportion of time submerged',
+                         title.position = 'bottom',
+                         title.hjust = 0.5,
+                         barwidth = unit(75, units = "mm"),
+                         barheight = unit(2, units = "mm"))) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  labs(title = "Spotted Seals (PL), 2024",
+       subtitle = "each bar represents 2 hours binned at 5m depth increments",
+       caption = stringr::str_wrap("data derived from the Emperical Cumulative 
+                                   Distribution (ECD) of time at depth 
+                                   transmitted via the Argos satellite network")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+:::
 
 ### Time At Depth from Histogram Bins
 
@@ -545,6 +631,8 @@ profile upcast from the deepest dive during a two hour summary period. This
 provides unique insight into the oceanography and structure of the water these
 seals are foraging in.
 
+::: {.panel-tabset}
+
 ```{r}
 pdt_data <- data_list$pdt %>% 
   group_by(deploy_id,date) %>% 
@@ -560,13 +648,17 @@ pdt_data <- data_list$pdt %>%
                 prev_depth = prev_depth * -1) %>% 
   ungroup() %>% 
   left_join(deploy_tbl, by=c("deploy_id" = "deployid")) %>% 
+  dplyr::rename(species = common_name) |> 
   dplyr::filter(between(data_hr,deploy_date_time_gmt,deploy_end_date_time_gmt))
 ```
 
+### Ribbon seals
+
 ```{r}
-#| fig-asp: 1.4
+#| fig-asp: 1.3
 pdt_data %>% 
-  filter(depth<0,speno != 'PL2024_1017') %>% 
+  filter(depth<0,
+         species == 'ribbon seal') %>% 
 ggplot() +
   geom_rect(aes(xmin = x1, xmax = x2,
                 ymin = prev_depth, ymax=depth,
@@ -588,20 +680,55 @@ ggplot() +
   theme(legend.position = "bottom")
 ```
 
+### Spotted seals
+
+```{r}
+#| fig-asp: 1.3
+pdt_data %>% 
+  filter(depth<0,speno != 'PL2024_1017',
+         species == 'spotted seal') %>% 
+ggplot() +
+  geom_rect(aes(xmin = x1, xmax = x2,
+                ymin = prev_depth, ymax=depth,
+                fill=min_te), colour=NA) +
+  scale_fill_distiller(palette = "Spectral",
+                   direction = -1,
+                       guide = guide_colorbar(
+                         title = 'temperature (C)',
+                         title.position = 'bottom',
+                         title.hjust = 0.5,
+                         barwidth = unit(75, units = "mm"),
+                         barheight = unit(2, units = "mm"))) +
+  scale_x_datetime() +
+  facet_grid(speno ~ .) +
+  ylab("depth (meters)") +
+  labs(title = "Temperature at Depth (transmitted)",
+       subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+:::
+
 ## Satellite Transmissions
 
 This figure provides some diagnostic and performance insights to tag deployments
 and attachment locations.
 
+::: {.panel-tabset}
+
+### Ribbon seals
+
 ```{r}
-#| fig.asp: 1.7
+#| fig.asp: 1.2
 
 msg_data <- data_list$messages |> 
   left_join(deploy_tbl) |> 
   dplyr::filter(between(msg_date,
                         deploy_date_time_gmt,
                         deploy_end_date_time_gmt)) |> 
-  dplyr::select(speno,attachment,msg_date,msg_count=msg) |> 
+  dplyr::filter(common_name == 'ribbon seal') |> 
+  dplyr::select(species=common_name,speno,attachment,msg_date,msg_count=msg) |> 
   dplyr::mutate(msg_day = lubridate::date(msg_date)) |> 
   dplyr::group_by(speno,attachment,msg_day) |> 
   dplyr::summarise(total_count = sum(msg_count))
@@ -617,3 +744,33 @@ ggplot(data = msg_data) +
   theme(legend.position = "top",
         legend.title=element_blank())
 ```
+
+### Spotted seals
+
+```{r}
+#| fig.asp: 1.3
+
+msg_data <- data_list$messages |> 
+  left_join(deploy_tbl) |> 
+  dplyr::filter(between(msg_date,
+                        deploy_date_time_gmt,
+                        deploy_end_date_time_gmt)) |> 
+  dplyr::filter(common_name == 'spotted seal') |> 
+  dplyr::select(species=common_name,speno,attachment,msg_date,msg_count=msg) |> 
+  dplyr::mutate(msg_day = lubridate::date(msg_date)) |> 
+  dplyr::group_by(speno,attachment,msg_day) |> 
+  dplyr::summarise(total_count = sum(msg_count))
+
+ggplot(data = msg_data) + 
+  geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
+  scale_fill_carto_d(palette = "Vivid") +
+  facet_grid(speno ~ .) +
+  ylab("date") +
+  labs(title = "Satellite Messages Recieved by Attachment Type",
+       subtitle = "each bar the total number of messages recieved each day",) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title=element_blank())
+```
+
+:::
