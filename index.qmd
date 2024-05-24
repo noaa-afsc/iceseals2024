@@ -140,12 +140,14 @@ tab_options(
 Each seal is released with a bio-logger that provides regular updates on
 movement and behavior. For each seal, the observed locations are used to fit a
 predicted path. Both the predicted track (line) and the observed bio-logger
-locations (points) are shown on the map. Because some of the tracks span the 180
-anti-meridian, you may need to re-center and zoom the map to the Bering Sea
-region.
+locations (points) are shown on the map. The ship track of the _R/V Norseman II_
+is shown in black and can be toggled on/off using the layer selector in the
+upper left corner.
 
-The ship track of the R/V Norseman II is shown in black and can be toggled
-on/off using the layer selector in the upper left corner.
+**Because some of the tracks span the 180 anti-meridian, you may need to re-center
+and zoom the map to the Bering Sea region.**
+
+
 
 ```{r}
 #| include: false
