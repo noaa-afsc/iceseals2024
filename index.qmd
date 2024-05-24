@@ -82,7 +82,7 @@ deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds'))  |>
 #| include: false
 #data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('PL2024_1023_18U1318','HF2024_1021_19U2627','HF2024_1019_19U2623')])
 
-data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('HF2024_1019_19U2623')]) 
+data_list <- get_wc_data(deploy_tbl$deployid) 
 ```
 
 ::: callout-warning
