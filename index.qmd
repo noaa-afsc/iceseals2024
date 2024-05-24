@@ -234,6 +234,27 @@ map_locs <- locs %>%
   sf::st_transform(4326) %>% 
   group_by(speno) 
 
+map_locs_adult <- map_locs |> 
+  dplyr::filter(age == 'adult')
+map_locs_subadult <- map_locs |> 
+  dplyr::filter(age == 'sub-adult')
+map_locs_yoy <- map_locs |> 
+  dplyr::filter(age == 'young-of-year')
+
+map_lines_adult <- map_lines |> 
+  dplyr::filter(age == 'adult')
+map_lines_subadult <- map_lines |> 
+  dplyr::filter(age == 'sub-adult')
+map_lines_yoy <- map_lines |> 
+  dplyr::filter(age == 'young-of-year')
+
+map_last_loc_adult <- map_last_loc |> 
+  dplyr::filter(age == 'adult')
+map_last_loc_subadult <- map_last_loc |> 
+  dplyr::filter(age == 'sub-adult')
+map_last_loc_yoy <- map_last_loc |> 
+  dplyr::filter(age == 'young-of-year')
+
 ship_track <- readr::read_rds(here::here('data/ship_track.rds'))
 
 mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
@@ -287,12 +308,190 @@ mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p
                     get_position = geometry,
                     pickable = TRUE,
                     tooltip = c(speno,datetime))
+
+mapbox_map_adult <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+                initial_bounds = bbox_center[1],
+                theme = "light",
+                controller = TRUE) %>%
+  add_path_layer(data = ship_track,
+                    name = "Ship Track",
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_color = "#000000",
+                    opacity = 0.25,
+                    get_path = geometry) |> 
+  add_path_layer(data = map_lines_adult,
+                    name = "Predicted Movements of Adults",
+                    opacity = 0.8,
+                    get_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel")
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_path = geometry) %>%
+    add_scatterplot_layer(data = map_locs_adult,
+                    name = "Observed Locations of Adults",
+                    opacity = 0.35,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 2,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime)) %>% 
+  add_scatterplot_layer(data = map_last_loc_adult,
+                    name = "Latest Location of Adults",
+                    opacity = 1,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 4,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime))
+
+mapbox_map_subadult <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+                initial_bounds = bbox_center[1],
+                theme = "light",
+                controller = TRUE) %>%
+  add_path_layer(data = ship_track,
+                    name = "Ship Track",
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_color = "#000000",
+                    opacity = 0.25,
+                    get_path = geometry) |> 
+  add_path_layer(data = map_lines_subadult,
+                    name = "Predicted Movements of Sub-adults",
+                    opacity = 0.8,
+                    get_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel")
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_path = geometry) %>%
+    add_scatterplot_layer(data = map_locs_subadult,
+                    name = "Observed Locations of Sub-adults",
+                    opacity = 0.35,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 2,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime)) %>% 
+  add_scatterplot_layer(data = map_last_loc_subadult,
+                    name = "Latest Location of Sub-adults",
+                    opacity = 1,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 4,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime))
+
+mapbox_map_yoy <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+                initial_bounds = bbox_center[1],
+                theme = "light",
+                controller = TRUE) %>%
+  add_path_layer(data = ship_track,
+                    name = "Ship Track",
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_color = "#000000",
+                    opacity = 0.25,
+                    get_path = geometry) |> 
+  add_path_layer(data = map_lines_yoy,
+                    name = "Predicted Movements of Young-of-Year",
+                    opacity = 0.8,
+                    get_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel")
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    width_min_pixels = 1.5,
+                    get_path = geometry) %>%
+    add_scatterplot_layer(data = map_locs_yoy,
+                    name = "Observed Locations of Young-of-Year",
+                    opacity = 0.35,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 2,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime)) %>% 
+  add_scatterplot_layer(data = map_last_loc_yoy,
+                    name = "Latest Location of Young-of-Year",
+                    opacity = 1,
+                    get_fill_color = scale_color_category(
+                      col = speno,
+                      palette = rcartocolor::carto_pal(name = "Pastel"),
+                      legend = FALSE
+                      ),
+                    wrap_longitude = TRUE,
+                    position_format = "XY",
+                    radius_min_pixels = 4,
+                    get_position = geometry,
+                    pickable = TRUE,
+                    tooltip = c(speno,datetime))
 ```
 
 ::: column-page
+
+::: {.panel-tabset}
+
+### All Age Classes
 ```{r}
 mapbox_map
 ```
+
+### Adults
+```{r}
+mapbox_map_adult
+```
+
+### Sub-adults
+```{r}
+mapbox_map_subadult
+```
+
+### Young-of-Year
+```{r}
+mapbox_map_yoy
+```
+
+:::
+
 :::
 
 
