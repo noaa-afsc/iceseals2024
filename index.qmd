@@ -429,7 +429,7 @@ ecd_data <- ecd_data %>%
 #### Ribbon seals
 
 ```{r}
-#| fig-asp: 1.2
+#| fig-asp: 1.3
 ecd_data %>% 
   dplyr::filter(species == 'ribbon seal',
                 between(end,
@@ -452,7 +452,7 @@ ggplot() +
                          barwidth = unit(75, units = "mm"),
                          barheight = unit(2, units = "mm"))) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Ribbon Seals (HF), 2024",
        subtitle = "each bar represents 2 hours binned at 5m depth increments",
@@ -460,13 +460,14 @@ ggplot() +
                                    Distribution (ECD) of time at depth 
                                    transmitted via the Argos satellite network")) +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1),
+        legend.position = "bottom")
 ```
 
 #### Spotted seals
 
 ```{r}
-#| fig-asp: 1.2
+#| fig-asp: 1.3
 ecd_data %>% 
   left_join(deploy_tbl) %>% 
   dplyr::filter(species == 'spotted seal',
@@ -490,7 +491,7 @@ ggplot() +
                          barwidth = unit(75, units = "mm"),
                          barheight = unit(2, units = "mm"))) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Spotted Seals (PL), 2024",
        subtitle = "each bar represents 2 hours binned at 5m depth increments",
@@ -498,7 +499,8 @@ ggplot() +
                                    Distribution (ECD) of time at depth 
                                    transmitted via the Argos satellite network")) +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1),
+        legend.position = "bottom")
 ```
 
 :::
@@ -548,14 +550,15 @@ ggplot() +
                          barwidth = unit(75, units = "mm"),
                          barheight = unit(2, units = "mm"))) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Spotted Seal (PL2024_1003) Time at Depth",
        subtitle = "each bar represents 2 hours binned at set depth increments",
        caption = stringr::str_wrap("histograms of time at depth 
                                    transmitted via the Argos satellite network")) +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        strip.text = element_text(hjust = 1))
 ```
 
 ### Dive Behavior Records
@@ -580,14 +583,15 @@ ggplot() +
                 linetype=0,
                 fill = rcartocolor::carto_pal(3,"Bold")[1]) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Spotted Seal Dive Behavior",
        subtitle = "each bar represents a single dive",
   caption = stringr::str_wrap("dive behavior details 
                                    transmitted via the Argos satellite network")) +
   theme_minimal() +
-  theme(axis.title = element_text())
+  theme(axis.title = element_text(),
+        strip.text = element_text(hjust = 1))
 ```
 
 ```{r}
@@ -609,12 +613,13 @@ data_list$behav |>
             position = position_nudge(y = 0.1),
             fill = rcartocolor::carto_pal(3,"Bold")[1]
   ) +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   xlab("dive duration (seconds)") +
   labs(title = "Spotted Seal Dive Duration",
        subtitle = "rain cloud plot showing distribution of dive durations") +
   theme_minimal() +
   theme(
+    strip.text = element_text(hjust = 1),
     axis.title.y = element_blank(),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank()
@@ -672,12 +677,13 @@ ggplot() +
                          barwidth = unit(75, units = "mm"),
                          barheight = unit(2, units = "mm"))) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Temperature at Depth (transmitted)",
        subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        strip.text = element_text(hjust = 1),)
 ```
 
 ### Spotted seals
@@ -700,12 +706,13 @@ ggplot() +
                          barwidth = unit(75, units = "mm"),
                          barheight = unit(2, units = "mm"))) +
   scale_x_datetime() +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ .,ncol=1) +
   ylab("depth (meters)") +
   labs(title = "Temperature at Depth (transmitted)",
        subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1),
+        legend.position = "bottom")
 ```
 
 :::
@@ -720,7 +727,7 @@ and attachment locations.
 ### Ribbon seals
 
 ```{r}
-#| fig.asp: 1.2
+#| fig.asp: 1.3
 cols <- carto_pal(n=4,'Vivid')[1:3]
 attachment <- c("Flipper","Head","Nape")
 
@@ -740,19 +747,20 @@ msg_data <- data_list$messages |>
 ggplot(data = msg_data) + 
   geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
   scale_fill_manual(values = cols) +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("date") +
   labs(title = "Satellite Messages Recieved by Attachment Type",
        subtitle = "each bar the total number of messages recieved each day",) +
   theme_minimal() +
-  theme(legend.position = "top",
+  theme(strip.text = element_text(hjust = 1),
+        legend.position = "top",
         legend.title=element_blank())
 ```
 
 ### Spotted seals
 
 ```{r}
-#| fig.asp: 1.4
+#| fig.asp: 1.3
 
 msg_data <- data_list$messages |> 
   left_join(deploy_tbl) |> 
@@ -768,12 +776,13 @@ msg_data <- data_list$messages |>
 ggplot(data = msg_data) + 
   geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
   scale_fill_manual(values = cols) +
-  facet_grid(speno ~ .) +
+  facet_wrap(speno ~ .,ncol=1) +
   ylab("date") +
   labs(title = "Satellite Messages Recieved by Attachment Type",
        subtitle = "each bar the total number of messages recieved each day",) +
   theme_minimal() +
-  theme(legend.position = "top",
+  theme(strip.text = element_text(hjust = 1),
+        legend.position = "top",
         legend.title=element_blank())
 ```
 
