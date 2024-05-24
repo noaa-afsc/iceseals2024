@@ -10,7 +10,7 @@ cruise_bbox <- st_bbox(c(xmin = -166.5,
   st_as_sfc()
 
 
-ship_track_pts <- sf::st_read(here::here('data/export_05182024.kml')) |> 
+ship_track_pts <- sf::st_read(here::here('data/iceseals_2024_logbook.kml')) |> 
   sf::st_filter(cruise_bbox)
   
 
