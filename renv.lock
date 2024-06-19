@@ -225,7 +225,7 @@
     },
     "aniMotum": {
       "Package": "aniMotum",
-      "Version": "1.2-05",
+      "Version": "1.2-06",
       "Source": "Repository",
       "Repository": "https://ianjonsen.r-universe.dev",
       "Requirements": [
@@ -246,7 +246,7 @@
         "traipse",
         "trip"
       ],
-      "Hash": "dbe15635c9f4cbe9c19be725dc7eb011"
+      "Hash": "ba774969ff1c02a58b6e825f863ed9e6"
     },
     "askpass": {
       "Package": "askpass",
