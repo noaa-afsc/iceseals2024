@@ -73,7 +73,7 @@ library(ggdist)
 
 r_files <- fs::dir_ls(here::here('R'), glob = "*.R")
 purrr::map(r_files, source)
-deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds'))  |>  
+deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds')) |>
   dplyr::mutate(deploy_end_date_time_gmt = lubridate::as_date('2025-12-31'))
 
 ```
@@ -82,7 +82,7 @@ deploy_tbl <- readr::read_rds(here::here('data/deploy_tbl.rds'))  |>
 #| include: false
 #data_list <- get_wc_data(deploy_tbl$deployid[!deploy_tbl$deployid %in% c('PL2024_1023_18U1318','HF2024_1021_19U2627','HF2024_1019_19U2623')])
 
-data_list <- get_wc_data(deploy_tbl$deployid) 
+data_list <- get_wc_data(deploy_tbl$deployid)
 ```
 
 ::: callout-warning
@@ -111,26 +111,26 @@ summary_tbl <- readr::read_rds(here::here('data/summary_tbl.rds'))
 ```
 
 ```{r}
-gt(summary_tbl) |> 
-cols_label(
-  speno = "SPENO",
-  date = "Date",
-  species = "Species",
-  sex = "Sex",
-  age = "Age",
-  molt_status = "Molt Status",
-  mass = "Mass (kg)",
-  splash = "SPLASH",
-  spot6 = "SPOT6"
-) |> 
-tab_spanner(
-      label = md('Bio-logger Type & Location'),
-      columns = 8:9
-    ) |> 
-opt_stylize(style = 6, color = 'gray') |> 
-tab_options(
-  table.font.size = px(12)
-)
+gt(summary_tbl) |>
+  cols_label(
+    speno = "SPENO",
+    date = "Date",
+    species = "Species",
+    sex = "Sex",
+    age = "Age",
+    molt_status = "Molt Status",
+    mass = "Mass (kg)",
+    splash = "SPLASH",
+    spot6 = "SPOT6"
+  ) |>
+  tab_spanner(
+    label = md('Bio-logger Type & Location'),
+    columns = 8:9
+  ) |>
+  opt_stylize(style = 6, color = 'gray') |>
+  tab_options(
+    table.font.size = px(12)
+  )
 ```
 
 
@@ -153,35 +153,42 @@ and zoom the map to the Bering Sea region.**
 #| include: false
 map_proj <- "+proj=laea +lat_0=90 +lon_0=180 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
 
-locs <- sf::st_as_sf(data_list$locs,
-                     coords = c("longitude","latitude"),
-                     crs = 4326) %>% 
-  left_join(deploy_tbl) %>% 
-  dplyr::filter(between(date_time,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt)) %>% 
-  dplyr::rename(datetime=date_time)
+locs <- sf::st_as_sf(
+  data_list$locs,
+  coords = c("longitude", "latitude"),
+  crs = 4326
+) %>%
+  left_join(deploy_tbl) %>%
+  dplyr::filter(between(
+    date_time,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  )) %>%
+  dplyr::rename(datetime = date_time)
 
 locs <- locs %>%
   group_by(speno) %>%
   arrange(datetime, error_radius) %>%
-    mutate(
-      rank = 1L,
-      rank = case_when(duplicated(datetime, fromLast = FALSE) ~
-                         lag(rank) + 1L, TRUE ~ rank)) %>%
-    dplyr::filter(rank == 1) %>% 
-  arrange(speno,datetime) %>% 
-  ungroup() 
+  mutate(
+    rank = 1L,
+    rank = case_when(
+      duplicated(datetime, fromLast = FALSE) ~ lag(rank) + 1L,
+      TRUE ~ rank
+    )
+  ) %>%
+  dplyr::filter(rank == 1) %>%
+  arrange(speno, datetime) %>%
+  ungroup()
 
-locs <- locs |> 
+locs <- locs |>
   dplyr::mutate(
     quality = case_when(
       type == 'FastGPS' ~ 'G',
       type == 'User' ~ 'G',
       .default = quality
     )
-  ) |> 
-  dplyr::filter(!quality %in% c('Z')) |> 
+  ) |>
+  dplyr::filter(!quality %in% c('Z')) |>
   sf::st_transform(map_proj)
 
 locs_fit <- fit_ssm(
@@ -201,269 +208,305 @@ locs_fit <- fit_ssm(
 )
 
 predict_pts_sf <-
-  grab(locs_fit,
-       what = "predicted",
-       as_sf = TRUE,
-       group = TRUE) |> 
-  rename(speno = id,
-         datetime = date) |> 
+  grab(locs_fit, what = "predicted", as_sf = TRUE, group = TRUE) |>
+  rename(speno = id, datetime = date) |>
   left_join(deploy_tbl)
 
-predict_lines_sf <- predict_pts_sf %>% 
+predict_lines_sf <- predict_pts_sf %>%
   group_by(speno) %>%
   summarise(do_union = FALSE) %>%
   st_cast("LINESTRING") %>%
   left_join(deploy_tbl)
 
-map_lines <- predict_lines_sf |> 
-st_transform(4326)
+map_lines <- predict_lines_sf |>
+  st_transform(4326)
 
-bbox_center <- st_bbox(predict_lines_sf) %>% 
-  st_as_sfc() |> 
-st_transform(4326) |> 
-st_break_antimeridian(lon_0=180)
+bbox_center <- st_bbox(predict_lines_sf) %>%
+  st_as_sfc() |>
+  st_transform(4326) |>
+  st_break_antimeridian(lon_0 = 180)
 
-map_last_loc <- predict_pts_sf %>% 
-  sf::st_transform(4326) %>% 
-  group_by(speno) %>% 
-  arrange(speno,datetime) %>% 
-  group_map(~ tail(.x, 1L), .keep=TRUE) %>% 
+map_last_loc <- predict_pts_sf %>%
+  sf::st_transform(4326) %>%
+  group_by(speno) %>%
+  arrange(speno, datetime) %>%
+  group_map(~ tail(.x, 1L), .keep = TRUE) %>%
   bind_rows()
 
-map_locs <- locs %>% 
-  sf::st_transform(4326) %>% 
-  group_by(speno) 
+map_locs <- locs %>%
+  sf::st_transform(4326) %>%
+  group_by(speno)
 
-map_locs_adult <- map_locs |> 
+map_locs_adult <- map_locs |>
   dplyr::filter(age == 'adult')
-map_locs_subadult <- map_locs |> 
+map_locs_subadult <- map_locs |>
   dplyr::filter(age == 'sub-adult')
-map_locs_yoy <- map_locs |> 
+map_locs_yoy <- map_locs |>
   dplyr::filter(age == 'young-of-year')
 
-map_lines_adult <- map_lines |> 
+map_lines_adult <- map_lines |>
   dplyr::filter(age == 'adult')
-map_lines_subadult <- map_lines |> 
+map_lines_subadult <- map_lines |>
   dplyr::filter(age == 'sub-adult')
-map_lines_yoy <- map_lines |> 
+map_lines_yoy <- map_lines |>
   dplyr::filter(age == 'young-of-year')
 
-map_last_loc_adult <- map_last_loc |> 
+map_last_loc_adult <- map_last_loc |>
   dplyr::filter(age == 'adult')
-map_last_loc_subadult <- map_last_loc |> 
+map_last_loc_subadult <- map_last_loc |>
   dplyr::filter(age == 'sub-adult')
-map_last_loc_yoy <- map_last_loc |> 
+map_last_loc_yoy <- map_last_loc |>
   dplyr::filter(age == 'young-of-year')
 
 ship_track <- readr::read_rds(here::here('data/ship_track.rds'))
 
-mapbox_map <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
-                initial_bounds = bbox_center[1],
-                theme = "light",
-                controller = TRUE) %>%
-  add_path_layer(data = ship_track,
-                    name = "Ship Track",
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_color = "#000000",
-                    opacity = 0.25,
-                    get_path = geometry) |> 
-  add_path_layer(data = map_lines,
-                    name = "Predicted Movements",
-                    opacity = 0.8,
-                    get_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel")
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_path = geometry) %>%
-    add_scatterplot_layer(data = map_locs,
-                    name = "Observed Locations",
-                    opacity = 0.35,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 2,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime)) %>% 
-  add_scatterplot_layer(data = map_last_loc,
-                    name = "Latest Location",
-                    opacity = 1,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 4,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime))
+mapbox_map <- rdeck(
+  map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+  initial_bounds = bbox_center[1],
+  theme = "light",
+  controller = TRUE
+) %>%
+  add_path_layer(
+    data = ship_track,
+    name = "Ship Track",
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_color = "#000000",
+    opacity = 0.25,
+    get_path = geometry
+  ) |>
+  add_path_layer(
+    data = map_lines,
+    name = "Predicted Movements",
+    opacity = 0.8,
+    get_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel")
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_path = geometry
+  ) %>%
+  add_scatterplot_layer(
+    data = map_locs,
+    name = "Observed Locations",
+    opacity = 0.35,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 2,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  ) %>%
+  add_scatterplot_layer(
+    data = map_last_loc,
+    name = "Latest Location",
+    opacity = 1,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 4,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  )
 
-mapbox_map_adult <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
-                initial_bounds = bbox_center[1],
-                theme = "light",
-                controller = TRUE) %>%
-  add_path_layer(data = ship_track,
-                    name = "Ship Track",
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_color = "#000000",
-                    opacity = 0.25,
-                    get_path = geometry) |> 
-  add_path_layer(data = map_lines_adult,
-                    name = "Predicted Movements of Adults",
-                    opacity = 0.8,
-                    get_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel")
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_path = geometry) %>%
-    add_scatterplot_layer(data = map_locs_adult,
-                    name = "Observed Location",
-                    opacity = 0.35,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 2,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime)) %>% 
-  add_scatterplot_layer(data = map_last_loc_adult,
-                    name = "Latest Location",
-                    opacity = 1,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 4,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime))
+mapbox_map_adult <- rdeck(
+  map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+  initial_bounds = bbox_center[1],
+  theme = "light",
+  controller = TRUE
+) %>%
+  add_path_layer(
+    data = ship_track,
+    name = "Ship Track",
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_color = "#000000",
+    opacity = 0.25,
+    get_path = geometry
+  ) |>
+  add_path_layer(
+    data = map_lines_adult,
+    name = "Predicted Movements of Adults",
+    opacity = 0.8,
+    get_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel")
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_path = geometry
+  ) %>%
+  add_scatterplot_layer(
+    data = map_locs_adult,
+    name = "Observed Location",
+    opacity = 0.35,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 2,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  ) %>%
+  add_scatterplot_layer(
+    data = map_last_loc_adult,
+    name = "Latest Location",
+    opacity = 1,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 4,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  )
 
-mapbox_map_subadult <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
-                initial_bounds = bbox_center[1],
-                theme = "light",
-                controller = TRUE) %>%
-  add_path_layer(data = ship_track,
-                    name = "Ship Track",
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_color = "#000000",
-                    opacity = 0.25,
-                    get_path = geometry) |> 
-  add_path_layer(data = map_lines_subadult,
-                    name = "Predicted Movements of Sub-adults",
-                    opacity = 0.8,
-                    get_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel")
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_path = geometry) %>%
-    add_scatterplot_layer(data = map_locs_subadult,
-                    name = "Observed Location",
-                    opacity = 0.35,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 2,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime)) %>% 
-  add_scatterplot_layer(data = map_last_loc_subadult,
-                    name = "Latest Location",
-                    opacity = 1,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 4,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime))
+mapbox_map_subadult <- rdeck(
+  map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+  initial_bounds = bbox_center[1],
+  theme = "light",
+  controller = TRUE
+) %>%
+  add_path_layer(
+    data = ship_track,
+    name = "Ship Track",
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_color = "#000000",
+    opacity = 0.25,
+    get_path = geometry
+  ) |>
+  add_path_layer(
+    data = map_lines_subadult,
+    name = "Predicted Movements of Sub-adults",
+    opacity = 0.8,
+    get_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel")
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_path = geometry
+  ) %>%
+  add_scatterplot_layer(
+    data = map_locs_subadult,
+    name = "Observed Location",
+    opacity = 0.35,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 2,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  ) %>%
+  add_scatterplot_layer(
+    data = map_last_loc_subadult,
+    name = "Latest Location",
+    opacity = 1,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 4,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  )
 
-mapbox_map_yoy <- rdeck(map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
-                initial_bounds = bbox_center[1],
-                theme = "light",
-                controller = TRUE) %>%
-  add_path_layer(data = ship_track,
-                    name = "Ship Track",
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_color = "#000000",
-                    opacity = 0.25,
-                    get_path = geometry) |> 
-  add_path_layer(data = map_lines_yoy,
-                    name = "Predicted Movements of Young-of-Year",
-                    opacity = 0.8,
-                    get_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel")
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    width_min_pixels = 1.5,
-                    get_path = geometry) %>%
-    add_scatterplot_layer(data = map_locs_yoy,
-                    name = "Observed Location",
-                    opacity = 0.35,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 2,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime)) %>% 
-  add_scatterplot_layer(data = map_last_loc_yoy,
-                    name = "Latest Location",
-                    opacity = 1,
-                    get_fill_color = scale_color_category(
-                      col = speno,
-                      palette = rcartocolor::carto_pal(name = "Pastel"),
-                      legend = FALSE
-                      ),
-                    wrap_longitude = TRUE,
-                    position_format = "XY",
-                    radius_min_pixels = 4,
-                    get_position = geometry,
-                    pickable = TRUE,
-                    tooltip = c(speno,datetime))
+mapbox_map_yoy <- rdeck(
+  map_style = "mapbox://styles/jmlondon/cl9kktfl2000v16pooqw5p2wz",
+  initial_bounds = bbox_center[1],
+  theme = "light",
+  controller = TRUE
+) %>%
+  add_path_layer(
+    data = ship_track,
+    name = "Ship Track",
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_color = "#000000",
+    opacity = 0.25,
+    get_path = geometry
+  ) |>
+  add_path_layer(
+    data = map_lines_yoy,
+    name = "Predicted Movements of Young-of-Year",
+    opacity = 0.8,
+    get_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel")
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    width_min_pixels = 1.5,
+    get_path = geometry
+  ) %>%
+  add_scatterplot_layer(
+    data = map_locs_yoy,
+    name = "Observed Location",
+    opacity = 0.35,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 2,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  ) %>%
+  add_scatterplot_layer(
+    data = map_last_loc_yoy,
+    name = "Latest Location",
+    opacity = 1,
+    get_fill_color = scale_color_category(
+      col = speno,
+      palette = rcartocolor::carto_pal(name = "Pastel"),
+      legend = FALSE
+    ),
+    wrap_longitude = TRUE,
+    position_format = "XY",
+    radius_min_pixels = 4,
+    get_position = geometry,
+    pickable = TRUE,
+    tooltip = c(speno, datetime)
+  )
 ```
 
 ::: column-page
@@ -505,20 +548,26 @@ adjust for apparent solar noon, subtract approximately 12 hours.
 ::: {.panel-tabset}
 
 ```{r}
-ho_data <- data_list$haul_out |> 
-  left_join(deploy_tbl) |> 
-  dplyr::filter(between(timeline_start_dt,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt))  |>  
-  dplyr::rename(haulout_dt=timeline_start_dt) |> 
-  dplyr::select(species = common_name, speno, haulout_dt, percent_dry)  |> 
-  dplyr::mutate(percent_dry = mean(percent_dry,na.rm=TRUE), 
-                                  .by = c(speno, haulout_dt)) |> 
-  arrange(speno,haulout_dt) |>  
-  mutate(year = lubridate::year(haulout_dt),
-         month = lubridate::month(haulout_dt,label=TRUE),
-         day = lubridate::day(haulout_dt),
-         hour = lubridate::hour(haulout_dt))
+ho_data <- data_list$haul_out |>
+  left_join(deploy_tbl) |>
+  dplyr::filter(between(
+    timeline_start_dt,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  )) |>
+  dplyr::rename(haulout_dt = timeline_start_dt) |>
+  dplyr::select(species = common_name, speno, haulout_dt, percent_dry) |>
+  dplyr::mutate(
+    percent_dry = mean(percent_dry, na.rm = TRUE),
+    .by = c(speno, haulout_dt)
+  ) |>
+  arrange(speno, haulout_dt) |>
+  mutate(
+    year = lubridate::year(haulout_dt),
+    month = lubridate::month(haulout_dt, label = TRUE),
+    day = lubridate::day(haulout_dt),
+    hour = lubridate::hour(haulout_dt)
+  )
 ```
 
 ### Ribbon seals
@@ -526,25 +575,40 @@ ho_data <- data_list$haul_out |>
 ```{r}
 #| fig-asp: 1.3
 
-p <- ggplot(ho_data |> dplyr::filter(species == 'ribbon seal'),aes(day,hour,fill=percent_dry))+
-  geom_tile(linewidth = 0.1, color = "grey75") + 
-  scico::scale_fill_scico(palette = "nuuk", direction = 1,
-  labels = scales::percent_format(scale=1),
-                       aesthetics = "fill",
-    guide = guide_colorbar(title.position = "top", barwidth = 15,
-                           barheight = 0.5, title.hjust = 0)
-    ) +
+p <- ggplot(
+  ho_data |> dplyr::filter(species == 'ribbon seal'),
+  aes(day, hour, fill = percent_dry)
+) +
+  geom_tile(linewidth = 0.1, color = "grey75") +
+  scico::scale_fill_scico(
+    palette = "nuuk",
+    direction = 1,
+    labels = scales::percent_format(scale = 1),
+    aesthetics = "fill",
+    guide = guide_colorbar(
+      title.position = "top",
+      barwidth = 15,
+      barheight = 0.5,
+      title.hjust = 0
+    )
+  ) +
   coord_cartesian(clip = "off")
 
-p <- p + facet_grid(speno~month)
-p <- p + scale_x_continuous(breaks = c(5,15,25), expand = c(0,0)) +
-  scale_y_continuous(breaks = c(4,12,20), labels = c("04:00","12:00","20:00"))
+p <- p + facet_grid(speno + year ~ month)
+p <- p +
+  scale_x_continuous(breaks = c(5, 15, 25), expand = c(0, 0)) +
+  scale_y_continuous(
+    breaks = c(4, 12, 20),
+    labels = c("04:00", "12:00", "20:00")
+  )
 
-p <- p + theme_minimal() +
+p <- p +
+  theme_minimal() +
   theme(legend.position = "top", legend.justification = "left") +
-  theme(strip.background = element_rect(colour="white")) +
-  theme(axis.ticks=element_blank()) +
-  xlab("day of month") + ylab("hour (UTC)")
+  theme(strip.background = element_rect(colour = "white")) +
+  theme(axis.ticks = element_blank()) +
+  xlab("day of month") +
+  ylab("hour (UTC)")
 p
 ```
 
@@ -553,26 +617,40 @@ p
 ```{r}
 #| fig-asp: 1.3
 
-p <- ggplot(ho_data |> dplyr::filter(species == 'spotted seal'),
-              aes(day,hour,fill=percent_dry))+
-  geom_tile(linewidth = 0.1, color = "grey75") + 
-  scico::scale_fill_scico(palette = "nuuk", direction = 1,
-  labels = scales::percent_format(scale=1),
-                       aesthetics = "fill",
-    guide = guide_colorbar(title.position = "top", barwidth = 15,
-                           barheight = 0.5, title.hjust = 0)
-    ) +
+p <- ggplot(
+  ho_data |> dplyr::filter(species == 'spotted seal'),
+  aes(day, hour, fill = percent_dry)
+) +
+  geom_tile(linewidth = 0.1, color = "grey75") +
+  scico::scale_fill_scico(
+    palette = "nuuk",
+    direction = 1,
+    labels = scales::percent_format(scale = 1),
+    aesthetics = "fill",
+    guide = guide_colorbar(
+      title.position = "top",
+      barwidth = 15,
+      barheight = 0.5,
+      title.hjust = 0
+    )
+  ) +
   coord_cartesian(clip = "off")
 
-p <- p + facet_grid(speno~month)
-p <- p + scale_x_continuous(breaks = c(5,15,25), expand = c(0,0)) +
-  scale_y_continuous(breaks = c(4,12,20), labels = c("04:00","12:00","20:00"))
+p <- p + facet_grid(speno + year ~ month)
+p <- p +
+  scale_x_continuous(breaks = c(5, 15, 25), expand = c(0, 0)) +
+  scale_y_continuous(
+    breaks = c(4, 12, 20),
+    labels = c("04:00", "12:00", "20:00")
+  )
 
-p <- p + theme_minimal() +
+p <- p +
+  theme_minimal() +
   theme(legend.position = "top", legend.justification = "left") +
-  theme(strip.background = element_rect(colour="white")) +
-  theme(axis.ticks=element_blank()) +
-  xlab("day of month") + ylab("hour (UTC)")
+  theme(strip.background = element_rect(colour = "white")) +
+  theme(axis.ticks = element_blank()) +
+  xlab("day of month") +
+  ylab("hour (UTC)")
 p
 ```
 
@@ -596,34 +674,51 @@ the summary period.
 ::: {.panel-tabset}
 
 ```{r}
-ecd_data <- data_list$ecdf %>% 
-  dplyr::rename(deployid = deploy_id) %>% 
-  dplyr::arrange(deployid, start) %>% 
-  left_join(deploy_tbl) %>% 
-  rowwise() %>% 
-  dplyr::mutate(spline_interp = list(spline_ecdf(full_ecdf, bin.width=5)),
-                depth50pct = x_pct_depth(full_ecdf,pct_tad = 0.5),
-                n_dives = if_else(all(is.na(n_dives_shallow),is.na(n_dives_deep)),
-                                  NA, mean(c(n_dives_shallow,n_dives_deep), na.rm=TRUE))
-  ) %>% 
-  dplyr::select(c(species = common_name,speno,deployid,deploy_date_time_gmt,deploy_end_date_time_gmt,start:percent_dry,shallow_ecdf, 
-                  deep_ecdf,full_ecdf,spline_interp,depth50pct, n_dives)) %>% 
-  unnest(spline_interp, keep_empty = TRUE) %>% 
-  group_by(deployid, start, end, kind, percent_dry) %>% 
-  dplyr::arrange(deployid, start, depth_break) %>% 
-  dplyr::mutate(propTAD = c(0,diff(ecd_prop)),
-                minTAD = 120*(1-0.01*percent_dry) * propTAD) %>% 
+ecd_data <- data_list$ecdf %>%
+  dplyr::rename(deployid = deploy_id) %>%
+  dplyr::arrange(deployid, start) %>%
+  left_join(deploy_tbl) %>%
+  rowwise() %>%
+  dplyr::mutate(
+    spline_interp = list(spline_ecdf(full_ecdf, bin.width = 5)),
+    depth50pct = x_pct_depth(full_ecdf, pct_tad = 0.5),
+    n_dives = if_else(
+      all(is.na(n_dives_shallow), is.na(n_dives_deep)),
+      NA,
+      mean(c(n_dives_shallow, n_dives_deep), na.rm = TRUE)
+    )
+  ) %>%
+  dplyr::select(c(
+    species = common_name,
+    speno,
+    deployid,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt,
+    start:percent_dry,
+    shallow_ecdf,
+    deep_ecdf,
+    full_ecdf,
+    spline_interp,
+    depth50pct,
+    n_dives
+  )) %>%
+  unnest(spline_interp, keep_empty = TRUE) %>%
+  group_by(deployid, start, end, kind, percent_dry) %>%
+  dplyr::arrange(deployid, start, depth_break) %>%
+  dplyr::mutate(
+    propTAD = c(0, diff(ecd_prop)),
+    minTAD = 120 * (1 - 0.01 * percent_dry) * propTAD
+  ) %>%
   # determine the next depth value
   dplyr::mutate(next_depth = dplyr::lead(depth_break)) %>%
   # determine previous depth for plotting
   dplyr::mutate(prev_depth = dplyr::lag(depth_break)) %>%
   dplyr::select(-next_depth) %>%
   # transform depths to negative values
-  dplyr::mutate(depth_break = depth_break * -1,
-                prev_depth = prev_depth * -1)
+  dplyr::mutate(depth_break = depth_break * -1, prev_depth = prev_depth * -1)
 
-ecd_data <- ecd_data %>% 
-  group_by(deployid) %>% 
+ecd_data <- ecd_data %>%
+  group_by(deployid) %>%
   arrange(start)
 ```
 
@@ -631,77 +726,105 @@ ecd_data <- ecd_data %>%
 
 ```{r}
 #| fig-asp: 1.3
-ecd_data %>% 
-  dplyr::filter(species == 'ribbon seal',
-                between(end,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt)) %>%
-ggplot() +
-  geom_rect(aes(xmin = start, xmax = end,
-                ymin = 0, ymax = percent_dry/10),
-            fill = "seashell3") +
-  geom_rect(aes(xmin = start, xmax = end,
-                ymin = depth_break, ymax = prev_depth,
-                fill = propTAD),
-            color = NA) +
-  scale_fill_distiller(palette = "Reds",
-                   direction = 1, trans = "log10",
-                       guide = guide_colorbar(
-                         title = 'proportion of time submerged',
-                         title.position = 'bottom',
-                         title.hjust = 0.5,
-                         barwidth = unit(75, units = "mm"),
-                         barheight = unit(2, units = "mm"))) +
+ecd_data %>%
+  dplyr::filter(
+    species == 'ribbon seal',
+    between(end, deploy_date_time_gmt, deploy_end_date_time_gmt)
+  ) %>%
+  ggplot() +
+  geom_rect(
+    aes(xmin = start, xmax = end, ymin = 0, ymax = percent_dry / 10),
+    fill = "seashell3"
+  ) +
+  geom_rect(
+    aes(
+      xmin = start,
+      xmax = end,
+      ymin = depth_break,
+      ymax = prev_depth,
+      fill = propTAD
+    ),
+    color = NA
+  ) +
+  scale_fill_distiller(
+    palette = "Reds",
+    direction = 1,
+    trans = "log10",
+    guide = guide_colorbar(
+      title = 'proportion of time submerged',
+      title.position = 'bottom',
+      title.hjust = 0.5,
+      barwidth = unit(75, units = "mm"),
+      barheight = unit(2, units = "mm")
+    )
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Ribbon Seals (HF), 2024",
-       subtitle = "each bar represents 2 hours binned at 5m depth increments",
-       caption = stringr::str_wrap("data derived from the Emperical Cumulative 
+  labs(
+    title = "Ribbon Seals (HF), 2024",
+    subtitle = "each bar represents 2 hours binned at 5m depth increments",
+    caption = stringr::str_wrap(
+      "data derived from the Emperical Cumulative 
                                    Distribution (ECD) of time at depth 
-                                   transmitted via the Argos satellite network")) +
+                                   transmitted via the Argos satellite network"
+    )
+  ) +
   theme_minimal() +
-  theme(strip.text = element_text(hjust = 1),
-        legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1), legend.position = "bottom")
 ```
 
 #### Spotted seals
 
 ```{r}
 #| fig-asp: 1.3
-ecd_data %>% 
-  left_join(deploy_tbl) %>% 
-  dplyr::filter(species == 'spotted seal',
-                between(end,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt)) %>%
-ggplot() +
-  geom_rect(aes(xmin = start, xmax = end,
-                ymin = 0, ymax = percent_dry/10),
-            fill = "seashell3") +
-  geom_rect(aes(xmin = start, xmax = end,
-                ymin = depth_break, ymax = prev_depth,
-                fill = propTAD),
-            color = NA) +
-  scale_fill_distiller(palette = "Reds",
-                   direction = 1, trans = "log10",
-                       guide = guide_colorbar(
-                         title = 'proportion of time submerged',
-                         title.position = 'bottom',
-                         title.hjust = 0.5,
-                         barwidth = unit(75, units = "mm"),
-                         barheight = unit(2, units = "mm"))) +
+ecd_data %>%
+  left_join(deploy_tbl) %>%
+  dplyr::filter(
+    species == 'spotted seal',
+    between(end, deploy_date_time_gmt, deploy_end_date_time_gmt)
+  ) %>%
+  ggplot() +
+  geom_rect(
+    aes(xmin = start, xmax = end, ymin = 0, ymax = percent_dry / 10),
+    fill = "seashell3"
+  ) +
+  geom_rect(
+    aes(
+      xmin = start,
+      xmax = end,
+      ymin = depth_break,
+      ymax = prev_depth,
+      fill = propTAD
+    ),
+    color = NA
+  ) +
+  scale_fill_distiller(
+    palette = "Reds",
+    direction = 1,
+    trans = "log10",
+    guide = guide_colorbar(
+      title = 'proportion of time submerged',
+      title.position = 'bottom',
+      title.hjust = 0.5,
+      barwidth = unit(75, units = "mm"),
+      barheight = unit(2, units = "mm")
+    )
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Spotted Seals (PL), 2024",
-       subtitle = "each bar represents 2 hours binned at 5m depth increments",
-       caption = stringr::str_wrap("data derived from the Emperical Cumulative 
+  labs(
+    title = "Spotted Seals (PL), 2024",
+    subtitle = "each bar represents 2 hours binned at 5m depth increments",
+    caption = stringr::str_wrap(
+      "data derived from the Emperical Cumulative 
                                    Distribution (ECD) of time at depth 
-                                   transmitted via the Argos satellite network")) +
+                                   transmitted via the Argos satellite network"
+    )
+  ) +
   theme_minimal() +
-  theme(strip.text = element_text(hjust = 1),
-        legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1), legend.position = "bottom")
 ```
 
 :::
@@ -715,51 +838,68 @@ than with the above cumulative distribution data.
 
 ```{r}
 #| fig-asp: 0.618
-data_list$tad %>% 
-  left_join(deploy_tbl) %>% 
-  dplyr::rename(start = tad_start_dt,
-                depth_break = bin_upper_limit) |> 
-  dplyr::arrange(deployid, start) |> 
+data_list$tad %>%
+  left_join(deploy_tbl) %>%
+  dplyr::rename(start = tad_start_dt, depth_break = bin_upper_limit) |>
+  dplyr::arrange(deployid, start) |>
   dplyr::mutate(end = start + lubridate::hours(2)) |>
-  dplyr::filter(between(end,deploy_date_time_gmt,deploy_end_date_time_gmt)) %>%
-  dplyr::filter(bin != 'bin14') |> 
-  dplyr::mutate(depth_break = as.numeric(depth_break),
-                pct_tad = pct_tad*0.01) |> 
-  group_by(deployid, start, end) |> 
+  dplyr::filter(between(
+    end,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  )) %>%
+  dplyr::filter(bin != 'bin14') |>
+  dplyr::mutate(
+    depth_break = as.numeric(depth_break),
+    pct_tad = pct_tad * 0.01
+  ) |>
+  group_by(deployid, start, end) |>
   # determine the next depth value
   dplyr::mutate(next_depth = dplyr::lead(depth_break)) %>%
   # determine previous depth for plotting
   dplyr::mutate(prev_depth = dplyr::lag(depth_break)) %>%
   dplyr::select(-next_depth) %>%
-  dplyr::mutate(prev_depth = ifelse(is.na(prev_depth),0,prev_depth)) |>
+  dplyr::mutate(prev_depth = ifelse(is.na(prev_depth), 0, prev_depth)) |>
   # transform depths to negative values
-  dplyr::mutate(depth_break = depth_break * -1,
-                prev_depth = prev_depth * -1) |> 
-  dplyr::filter(!is.na(pct_tad) & pct_tad > 0) |> 
-                
-ggplot() +
-  geom_rect(aes(xmin = start, xmax = end,
-                ymin = depth_break, ymax = prev_depth,
-                fill = pct_tad),
-            color = NA) +
-  scale_fill_distiller(palette = "Reds",
-                   direction = 1, trans = "log10",
-                       guide = guide_colorbar(
-                         title = 'proportion of time submerged',
-                         title.position = 'bottom',
-                         title.hjust = 0.5,
-                         barwidth = unit(75, units = "mm"),
-                         barheight = unit(2, units = "mm"))) +
+  dplyr::mutate(depth_break = depth_break * -1, prev_depth = prev_depth * -1) |>
+  dplyr::filter(!is.na(pct_tad) & pct_tad > 0) |>
+
+  ggplot() +
+  geom_rect(
+    aes(
+      xmin = start,
+      xmax = end,
+      ymin = depth_break,
+      ymax = prev_depth,
+      fill = pct_tad
+    ),
+    color = NA
+  ) +
+  scale_fill_distiller(
+    palette = "Reds",
+    direction = 1,
+    trans = "log10",
+    guide = guide_colorbar(
+      title = 'proportion of time submerged',
+      title.position = 'bottom',
+      title.hjust = 0.5,
+      barwidth = unit(75, units = "mm"),
+      barheight = unit(2, units = "mm")
+    )
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Spotted Seal (PL2024_1003) Time at Depth",
-       subtitle = "each bar represents 2 hours binned at set depth increments",
-       caption = stringr::str_wrap("histograms of time at depth 
-                                   transmitted via the Argos satellite network")) +
+  labs(
+    title = "Spotted Seal (PL2024_1003) Time at Depth",
+    subtitle = "each bar represents 2 hours binned at set depth increments",
+    caption = stringr::str_wrap(
+      "histograms of time at depth 
+                                   transmitted via the Argos satellite network"
+    )
+  ) +
   theme_minimal() +
-  theme(legend.position = "bottom",
-        strip.text = element_text(hjust = 1))
+  theme(legend.position = "bottom", strip.text = element_text(hjust = 1))
 ```
 
 ### Dive Behavior Records
@@ -774,50 +914,55 @@ distribution of dive duration.
 
 ```{r}
 #| fig-asp: 0.618
-data_list$behav |> 
-  left_join(deploy_tbl) |> 
-ggplot() + 
-  geom_rect(aes(xmin=start,
-                xmax=end,
-                ymin=0,
-                ymax=-1*depth_min),
-                linetype=0,
-                fill = rcartocolor::carto_pal(3,"Bold")[1]) +
+data_list$behav |>
+  left_join(deploy_tbl) |>
+  ggplot() +
+  geom_rect(
+    aes(xmin = start, xmax = end, ymin = 0, ymax = -1 * depth_min),
+    linetype = 0,
+    fill = rcartocolor::carto_pal(3, "Bold")[1]
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Spotted Seal Dive Behavior",
-       subtitle = "each bar represents a single dive",
-  caption = stringr::str_wrap("dive behavior details 
-                                   transmitted via the Argos satellite network")) +
+  labs(
+    title = "Spotted Seal Dive Behavior",
+    subtitle = "each bar represents a single dive",
+    caption = stringr::str_wrap(
+      "dive behavior details 
+                                   transmitted via the Argos satellite network"
+    )
+  ) +
   theme_minimal() +
-  theme(axis.title = element_text(),
-        strip.text = element_text(hjust = 1))
+  theme(axis.title = element_text(), strip.text = element_text(hjust = 1))
 ```
 
 ```{r}
 #| fig-asp: 0.618
-data_list$behav |> 
-  left_join(deploy_tbl) |> 
-  dplyr::filter(what == "Dive") |> 
-  dplyr::select(speno,what,depth_max,duration_max) |> 
+data_list$behav |>
+  left_join(deploy_tbl) |>
+  dplyr::filter(what == "Dive") |>
+  dplyr::select(speno, what, depth_max, duration_max) |>
   ggplot(aes(x = duration_max, y = what)) +
-  geom_boxplot(width = 0.05,
-              color = rcartocolor::carto_pal(3,"Bold")[1]) +
-  geom_point(shape = "|",
-             size = 8,
-             alpha = 0.15,
-             position = position_nudge(y = -0.15),
-             color = rcartocolor::carto_pal(3,"Bold")[1]
+  geom_boxplot(width = 0.05, color = rcartocolor::carto_pal(3, "Bold")[1]) +
+  geom_point(
+    shape = "|",
+    size = 8,
+    alpha = 0.15,
+    position = position_nudge(y = -0.15),
+    color = rcartocolor::carto_pal(3, "Bold")[1]
   ) +
-  stat_slab(height = 0.75,
-            position = position_nudge(y = 0.1),
-            fill = rcartocolor::carto_pal(3,"Bold")[1]
+  stat_slab(
+    height = 0.75,
+    position = position_nudge(y = 0.1),
+    fill = rcartocolor::carto_pal(3, "Bold")[1]
   ) +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   xlab("dive duration (seconds)") +
-  labs(title = "Spotted Seal Dive Duration",
-       subtitle = "rain cloud plot showing distribution of dive durations") +
+  labs(
+    title = "Spotted Seal Dive Duration",
+    subtitle = "rain cloud plot showing distribution of dive durations"
+  ) +
   theme_minimal() +
   theme(
     strip.text = element_text(hjust = 1),
@@ -826,7 +971,7 @@ data_list$behav |>
     axis.ticks.y = element_blank()
   ) +
   theme(axis.title = element_text())
-  
+
 ```
 
 
@@ -840,80 +985,93 @@ seals are foraging in.
 ::: {.panel-tabset}
 
 ```{r}
-pdt_data <- data_list$pdt %>% 
-  group_by(deploy_id,date) %>% 
-  mutate(data_hr = lubridate::round_date(date,unit="hour"),
-         x1 = data_hr - minutes(90),
-         x2 = data_hr + minutes(90)) %>% 
+pdt_data <- data_list$pdt %>%
+  group_by(deploy_id, date) %>%
+  mutate(
+    data_hr = lubridate::round_date(date, unit = "hour"),
+    x1 = data_hr - minutes(90),
+    x2 = data_hr + minutes(90)
+  ) %>%
   dplyr::mutate(next_depth = dplyr::lead(depth)) %>%
   # determine previous depth for plotting
   dplyr::mutate(prev_depth = dplyr::lag(depth)) %>%
   dplyr::select(-next_depth) %>%
   # transform depths to negative values
-  dplyr::mutate(depth = depth * -1,
-                prev_depth = prev_depth * -1) %>% 
-  ungroup() %>% 
-  left_join(deploy_tbl, by=c("deploy_id" = "deployid")) %>% 
-  dplyr::rename(species = common_name) |> 
-  dplyr::filter(between(data_hr,deploy_date_time_gmt,deploy_end_date_time_gmt))
+  dplyr::mutate(depth = depth * -1, prev_depth = prev_depth * -1) %>%
+  ungroup() %>%
+  left_join(deploy_tbl, by = c("deploy_id" = "deployid")) %>%
+  dplyr::rename(species = common_name) |>
+  dplyr::filter(between(
+    data_hr,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  ))
 ```
 
 ### Ribbon seals
 
 ```{r}
 #| fig-asp: 1.3
-pdt_data %>% 
-  filter(depth<0,
-         species == 'ribbon seal') %>% 
-ggplot() +
-  geom_rect(aes(xmin = x1, xmax = x2,
-                ymin = prev_depth, ymax=depth,
-                fill=min_te), colour=NA) +
-  scale_fill_distiller(palette = "Spectral",
-                   direction = -1,
-                       guide = guide_colorbar(
-                         title = 'temperature (C)',
-                         title.position = 'bottom',
-                         title.hjust = 0.5,
-                         barwidth = unit(75, units = "mm"),
-                         barheight = unit(2, units = "mm"))) +
+pdt_data %>%
+  filter(depth < 0, species == 'ribbon seal') %>%
+  ggplot() +
+  geom_rect(
+    aes(xmin = x1, xmax = x2, ymin = prev_depth, ymax = depth, fill = min_te),
+    colour = NA
+  ) +
+  scale_fill_distiller(
+    palette = "Spectral",
+    direction = -1,
+    guide = guide_colorbar(
+      title = 'temperature (C)',
+      title.position = 'bottom',
+      title.hjust = 0.5,
+      barwidth = unit(75, units = "mm"),
+      barheight = unit(2, units = "mm")
+    )
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ ., ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Temperature at Depth (transmitted)",
-       subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
+  labs(
+    title = "Temperature at Depth (transmitted)",
+    subtitle = "each bar depicts data from a single upcast as a 3-hour window"
+  ) +
   theme_minimal() +
-  theme(legend.position = "bottom",
-        strip.text = element_text(hjust = 1),)
+  theme(legend.position = "bottom", strip.text = element_text(hjust = 1), )
 ```
 
 ### Spotted seals
 
 ```{r}
 #| fig-asp: 1.3
-pdt_data %>% 
-  filter(depth<0,speno != 'PL2024_1017',
-         species == 'spotted seal') %>% 
-ggplot() +
-  geom_rect(aes(xmin = x1, xmax = x2,
-                ymin = prev_depth, ymax=depth,
-                fill=min_te), colour=NA) +
-  scale_fill_distiller(palette = "Spectral",
-                   direction = -1,
-                       guide = guide_colorbar(
-                         title = 'temperature (C)',
-                         title.position = 'bottom',
-                         title.hjust = 0.5,
-                         barwidth = unit(75, units = "mm"),
-                         barheight = unit(2, units = "mm"))) +
+pdt_data %>%
+  filter(depth < 0, speno != 'PL2024_1017', species == 'spotted seal') %>%
+  ggplot() +
+  geom_rect(
+    aes(xmin = x1, xmax = x2, ymin = prev_depth, ymax = depth, fill = min_te),
+    colour = NA
+  ) +
+  scale_fill_distiller(
+    palette = "Spectral",
+    direction = -1,
+    guide = guide_colorbar(
+      title = 'temperature (C)',
+      title.position = 'bottom',
+      title.hjust = 0.5,
+      barwidth = unit(75, units = "mm"),
+      barheight = unit(2, units = "mm")
+    )
+  ) +
   scale_x_datetime() +
-  facet_wrap(speno ~ .,ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("depth (meters)") +
-  labs(title = "Temperature at Depth (transmitted)",
-       subtitle = "each bar depicts data from a single upcast as a 3-hour window") +
+  labs(
+    title = "Temperature at Depth (transmitted)",
+    subtitle = "each bar depicts data from a single upcast as a 3-hour window"
+  ) +
   theme_minimal() +
-  theme(strip.text = element_text(hjust = 1),
-        legend.position = "bottom")
+  theme(strip.text = element_text(hjust = 1), legend.position = "bottom")
 ```
 
 :::
@@ -929,33 +1087,45 @@ and attachment locations.
 
 ```{r}
 #| fig.asp: 1.3
-cols <- carto_pal(n=4,'Vivid')[1:3]
-attachment <- c("Flipper","Head","Nape")
+cols <- carto_pal(n = 4, 'Vivid')[1:3]
+attachment <- c("Flipper", "Head", "Nape")
 
-cols <- setNames(cols,attachment)
+cols <- setNames(cols, attachment)
 
-msg_data <- data_list$messages |> 
-  left_join(deploy_tbl) |> 
-  dplyr::filter(between(msg_date,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt)) |> 
-  dplyr::filter(common_name == 'ribbon seal') |> 
-  dplyr::select(species=common_name,speno,attachment,msg_date,msg_count=msg) |> 
-  dplyr::mutate(msg_day = lubridate::date(msg_date)) |> 
-  dplyr::group_by(speno,attachment,msg_day) |> 
+msg_data <- data_list$messages |>
+  left_join(deploy_tbl) |>
+  dplyr::filter(between(
+    msg_date,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  )) |>
+  dplyr::filter(common_name == 'ribbon seal') |>
+  dplyr::select(
+    species = common_name,
+    speno,
+    attachment,
+    msg_date,
+    msg_count = msg
+  ) |>
+  dplyr::mutate(msg_day = lubridate::date(msg_date)) |>
+  dplyr::group_by(speno, attachment, msg_day) |>
   dplyr::summarise(total_count = sum(msg_count))
 
-ggplot(data = msg_data) + 
-  geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
+ggplot(data = msg_data) +
+  geom_col(aes(x = msg_day, y = total_count, fill = attachment)) +
   scale_fill_manual(values = cols) +
   facet_wrap(speno ~ ., ncol = 1) +
   ylab("date") +
-  labs(title = "Satellite Messages Recieved by Attachment Type",
-       subtitle = "each bar the total number of messages recieved each day",) +
+  labs(
+    title = "Satellite Messages Recieved by Attachment Type",
+    subtitle = "each bar the total number of messages recieved each day",
+  ) +
   theme_minimal() +
-  theme(strip.text = element_text(hjust = 1),
-        legend.position = "top",
-        legend.title=element_blank())
+  theme(
+    strip.text = element_text(hjust = 1),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
 ```
 
 ### Spotted seals
@@ -963,28 +1133,40 @@ ggplot(data = msg_data) +
 ```{r}
 #| fig.asp: 1.3
 
-msg_data <- data_list$messages |> 
-  left_join(deploy_tbl) |> 
-  dplyr::filter(between(msg_date,
-                        deploy_date_time_gmt,
-                        deploy_end_date_time_gmt)) |> 
-  dplyr::filter(common_name == 'spotted seal') |> 
-  dplyr::select(species=common_name,speno,attachment,msg_date,msg_count=msg) |> 
-  dplyr::mutate(msg_day = lubridate::date(msg_date)) |> 
-  dplyr::group_by(speno,attachment,msg_day) |> 
+msg_data <- data_list$messages |>
+  left_join(deploy_tbl) |>
+  dplyr::filter(between(
+    msg_date,
+    deploy_date_time_gmt,
+    deploy_end_date_time_gmt
+  )) |>
+  dplyr::filter(common_name == 'spotted seal') |>
+  dplyr::select(
+    species = common_name,
+    speno,
+    attachment,
+    msg_date,
+    msg_count = msg
+  ) |>
+  dplyr::mutate(msg_day = lubridate::date(msg_date)) |>
+  dplyr::group_by(speno, attachment, msg_day) |>
   dplyr::summarise(total_count = sum(msg_count))
 
-ggplot(data = msg_data) + 
-  geom_col(aes(x=msg_day,y=total_count,fill = attachment)) +
+ggplot(data = msg_data) +
+  geom_col(aes(x = msg_day, y = total_count, fill = attachment)) +
   scale_fill_manual(values = cols) +
-  facet_wrap(speno ~ .,ncol=1) +
+  facet_wrap(speno ~ ., ncol = 1) +
   ylab("date") +
-  labs(title = "Satellite Messages Recieved by Attachment Type",
-       subtitle = "each bar the total number of messages recieved each day",) +
+  labs(
+    title = "Satellite Messages Recieved by Attachment Type",
+    subtitle = "each bar the total number of messages recieved each day",
+  ) +
   theme_minimal() +
-  theme(strip.text = element_text(hjust = 1),
-        legend.position = "top",
-        legend.title=element_blank())
+  theme(
+    strip.text = element_text(hjust = 1),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
 ```
 
 :::
