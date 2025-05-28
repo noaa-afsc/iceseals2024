@@ -573,7 +573,8 @@ ho_data <- data_list$haul_out |>
 ### Ribbon seals
 
 ```{r}
-#| fig-asp: 3
+#| fig-asp: 2
+#| fig-width: 9
 
 p <- ggplot(
   ho_data |> dplyr::filter(species == 'ribbon seal'),
@@ -615,7 +616,8 @@ p
 ### Spotted seals
 
 ```{r}
-#| fig-asp: 3
+#| fig-asp: 2
+#| fig-width: 9
 
 p <- ggplot(
   ho_data |> dplyr::filter(species == 'spotted seal'),
